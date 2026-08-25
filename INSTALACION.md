@@ -28,8 +28,21 @@ Ten a mano los tres archivos del proyecto, que están en la carpeta
 - `Index.html`
 - `appsscript.json`
 
-Ábrelos con el Bloc de notas cuando toque copiarlos. Se ven feos porque son
-código, es normal.
+### Cómo abrirlos para copiar el código
+
+Aquí hay una trampa: si haces **doble clic** en `Index.html`, Windows lo
+abre con el navegador y te enseña el formulario, no el código. Para ver el
+código hay que abrirlo con el Bloc de notas:
+
+1. **Clic derecho** sobre el archivo.
+2. **Abrir con → Bloc de notas.**
+3. Si el Bloc de notas no aparece en la lista, entra en **Elegir otra
+   aplicación** y búscalo ahí.
+
+Ya dentro del Bloc de notas: `Ctrl + E` selecciona todo y `Ctrl + C` copia.
+
+Se ve feo, con símbolos raros y sin colores. Es normal: es código, y no
+está pensado para leerse, solo para copiarse entero.
 
 ---
 
