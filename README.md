@@ -16,6 +16,7 @@ derivados y con los textos redactados para una persona externa a la empresa.
 | `Code.gs` | Lógica del servidor: validación, subida a Drive, fila en el Sheet |
 | `Index.html` | El formulario que ve el cliente |
 | `appsscript.json` | Configuración del proyecto y del despliegue web |
+| `INSTALACION.md` | Guía de instalación paso a paso, para hacerla sin experiencia |
 
 ## Campos del formulario
 
@@ -79,20 +80,23 @@ En el menú **Devoluciones** de la hoja hay dos opciones:
 
 ## Instalación
 
-1. Abrir el Google Sheet que recibe las solicitudes (el que ya está
-   configurado en `HOJA_ID`).
-2. En ese Sheet: **Extensiones → Apps Script**.
-3. Pegar `Code.gs` e `Index.html` (este último con **+ → HTML**, nombre
+**Los pasos detallados, pantalla por pantalla, están en
+[INSTALACION.md](INSTALACION.md).** Esa guía está escrita para hacerla sin
+conocimientos previos; lo de aquí abajo es solo el resumen para quien ya
+conozca Apps Script.
+
+1. En el Sheet que recibe las solicitudes: **Extensiones → Apps Script**.
+2. Pegar `Code.gs` e `Index.html` (este último con **+ → HTML**, nombre
    `Index`).
-4. En **Configuración del proyecto**, marcar "Mostrar el archivo de
-   manifiesto `appsscript.json`" y pegar el contenido de `appsscript.json`.
-5. **Implementar → Nueva implementación → Aplicación web**:
-   - Ejecutar como: **Yo**
-   - Quién tiene acceso: **Cualquier usuario, incluso anónimo**
-6. Autorizar los permisos y copiar el enlace `/exec`: ese es el que se envía
+3. En **Configuración del proyecto**, marcar "Mostrar el archivo de
+   manifiesto `appsscript.json`" y pegar su contenido.
+4. **Implementar → Nueva implementación → Aplicación web**, ejecutando como
+   *Yo* y con acceso para **cualquier usuario, incluso sin cuenta de
+   Google**.
+5. Autorizar los permisos y copiar el enlace `/exec`: ese es el que se envía
    a los clientes.
-7. Volver al Sheet, recargarlo y ejecutar **Devoluciones → Preparar columnas
-   de seguimiento** una vez.
+6. Recargar el Sheet y ejecutar **Devoluciones → Preparar columnas de
+   seguimiento** una vez.
 
 > Para que un cambio llegue al enlace ya compartido hay que hacer
 > **Implementar → Administrar implementaciones → editar → Nueva versión**.
