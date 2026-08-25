@@ -39,7 +39,9 @@ código hay que abrirlo con el Bloc de notas:
 3. Si el Bloc de notas no aparece en la lista, entra en **Elegir otra
    aplicación** y búscalo ahí.
 
-Ya dentro del Bloc de notas: `Ctrl + E` selecciona todo y `Ctrl + C` copia.
+Ya dentro del Bloc de notas: `Ctrl + A` selecciona todo y `Ctrl + C` copia.
+Si prefieres no usar atajos, el menú **Edición → Seleccionar todo** hace lo
+mismo y no falla.
 
 Se ve feo, con símbolos raros y sin colores. Es normal: es código, y no
 está pensado para leerse, solo para copiarse entero.
@@ -68,14 +70,26 @@ debajo, un archivo llamado `Código.gs` (o `Code.gs`, según el idioma).
 1. Haz clic en el archivo `Código.gs` de la columna izquierda.
 2. En la zona central verás un texto que pone
    `function myFunction() { }` o similar. **Bórralo todo**: clic dentro,
-   `Ctrl + E` para seleccionar todo y `Supr`.
-3. Abre `Code.gs` con el Bloc de notas, selecciona todo (`Ctrl + E`) y
+   `Ctrl + A` para seleccionar todo y `Supr`.
+3. Abre `Code.gs` con el Bloc de notas, selecciona todo (`Ctrl + A`) y
    cópialo (`Ctrl + C`).
 4. Vuelve al editor de Google y pega (`Ctrl + V`).
 5. Guarda con `Ctrl + S`, o con el icono del disquete.
 
 No te preocupes si aparecen subrayados de colores: son avisos del editor,
 no errores.
+
+**Comprueba que se pegó entero.** Es el fallo más habitual y no da ningún
+error: simplemente el formulario sale roto. En el editor de Google, cada
+línea lleva su número a la izquierda:
+
+- Sube del todo con `Ctrl + Inicio`. La **línea 1** tiene que empezar por
+  `/**`.
+- Baja del todo con `Ctrl + Fin`. La última línea tiene que ser `}` y el
+  número de línea rondar el **414**.
+
+Si el número final es mucho menor, el pegado se quedó a medias: borra todo
+y repite.
 
 ---
 
@@ -95,9 +109,17 @@ Este es el archivo que ve el cliente. Hay que crearlo aparte.
    Sin `.html` al final y con la **I mayúscula**. Google le añade la
    extensión solo. Si le pones otro nombre, el formulario no aparecerá.
 4. El archivo nuevo se abre con unas líneas de ejemplo dentro. **Bórralas
-   todas** (`Ctrl + E`, `Supr`).
+   todas** (`Ctrl + A`, `Supr`).
 5. Abre `Index.html` con el Bloc de notas, copia todo y pégalo ahí.
 6. Guarda con `Ctrl + S`.
+
+**Comprueba también aquí que se pegó entero**, igual que antes:
+
+- Línea 1: `<!DOCTYPE html>`
+- Última línea: `</html>`, con el número de línea rondando el **485**.
+
+Si empieza por otra cosa, faltan trozos. Borra todo (`Ctrl + A`, `Supr`) y
+vuelve a pegar.
 
 ---
 
@@ -241,6 +263,7 @@ actualiza solo**. Hay que hacer esto:
 
 | Qué ves | Qué pasa |
 | --- | --- |
+| El formulario sale sin colores, sin títulos y sin campos | El archivo `Index` se pegó incompleto. Bórralo entero y vuelve a pegarlo comprobando que empieza por `<!DOCTYPE html>` y acaba en `</html>` |
 | El cliente ve una pantalla pidiendo iniciar sesión | En el Paso 5 no se eligió la opción más abierta en "Quién tiene acceso". Edita la implementación y cámbialo |
 | Sale "Se ha producido un error en la secuencia de comandos" | Casi siempre es que falta pegar algún archivo, o que el archivo HTML no se llama exactamente `Index` |
 | No aparece el menú **Devoluciones** en la hoja | Falta recargar la hoja con `F5`. Si sigue sin salir, revisa que el código esté pegado y guardado |
