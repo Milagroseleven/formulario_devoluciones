@@ -124,6 +124,9 @@ funciona en la hoja que contiene el script.
   pantalla.
 - **No** se envía aviso a administración con cada solicitud: el encargado
   revisa la hoja y actualiza el estado.
+- **Descartado** avisar por WhatsApp, como se hace con los pedidos de los
+  comerciales: estas solicitudes llevan IBAN y certificado de titularidad, y
+  un grupo de WhatsApp no es sitio para eso.
 
 ## Pendiente de confirmar
 
