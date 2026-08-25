@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f4f5f7;
+      margin: 0;
+      padding: 16px;
+      color: #1a1a1a;
+    }
+    .card {
+      background: #fff;
+      border-radius: 14px;
+      padding: 20px;
+      max-width: 480px;
+      margin: 0 auto;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+    }
+    h1 { font-size: 19px; margin: 0 0 4px; }
+    .subtitle { color: #666; font-size: 13px; margin: 0 0 16px; }
+    .intro {
+      padding: 12px;
+      background: #eff6ff;
+      border-radius: 8px;
+      font-size: 14px;
+      line-height: 1.45;
+      color: #1e40af;
+      margin-bottom: 4px;
+    }
+    label {
+      display: block;
+      font-weight: 600;
+      font-size: 14px;
+      margin: 18px 0 6px;
+    }
+    label .formato {
+      font-weight: 400;
+      color: #888;
+      font-size: 12px;
+      margin-left: 6px;
+    }
+    .req::after { content: ' *'; color: #d33; }
+    input[type="text"], input[type="tel"], input[type="email"],
+    input[type="number"], input[type="date"], select {
+      width: 100%;
+      padding: 12px;
+      font-size: 16px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      background: #fff;
+      font-family: inherit;
+    }
+    input:focus, select:focus { outline: 2px solid #2563eb; border-color: #2563eb; }
+    .hint { font-size: 12px; color: #888; margin-top: 4px; }
+    .oculto { display: none; }
+
+    .file-btns { display: flex; flex-direction: column; gap: 10px; }
+    .file-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      width: 100%;
+      padding: 16px;
+      font-size: 16px;
+      font-weight: 600;
+      border: 2px dashed #2563eb;
+      border-radius: 10px;
+      background: #eff6ff;
+      color: #2563eb;
+      cursor: pointer;
+    }
+    #fileInputCamera, #fileInputArchivo { display: none; }
+    #preview { margin-top: 12px; display: none; text-align: center; }
+    #preview img {
+      max-width: 100%;
+      max-height: 260px;
+      border-radius: 8px;
+      border: 1px solid #ddd;
+    }
+    #previewDoc {
+      display: none;
+      align-items: center;
+      gap: 10px;
+      margin-top: 12px;
+      padding: 12px;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      font-size: 14px;
+      word-break: break-all;
+      text-align: left;
+    }
+
+    .consent {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      margin-top: 22px;
+      padding: 12px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      font-size: 13px;
+      line-height: 1.45;
+      font-weight: 400;
+      cursor: pointer;
+    }
+    .consent input { width: 18px; height: 18px; flex-shrink: 0; margin-top: 1px; }
+    .consent.selected { border-color: #2563eb; background: #eff6ff; }
+
+    button#submitBtn {
+      width: 100%;
+      margin-top: 22px;
+      padding: 16px;
+      font-size: 17px;
+      font-weight: 700;
+      background: #16a34a;
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+    }
+    button#submitBtn:disabled { background: #9ca3af; }
+    #errorBox {
+      display: none;
+      margin-top: 14px;
+      padding: 12px;
+      background: #fef2f2;
+      color: #b91c1c;
+      border-radius: 8px;
+      font-size: 14px;
+    }
+    #successBox { display: none; text-align: center; padding: 10px; }
+    #successBox .check { font-size: 48px; margin-bottom: 8px; }
+    #successBox p { font-size: 14px; color: #444; line-height: 1.45; }
+    .codigo-caja {
+      margin: 16px 0 4px;
+      padding: 14px;
+      border: 2px dashed #2563eb;
+      border-radius: 10px;
+      background: #eff6ff;
+    }
+    .codigo-caja .etiqueta {
+      font-size: 12px;
+      color: #1e40af;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+    .codigo-caja .valor {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 20px;
+      font-weight: 700;
+      color: #1e3a8a;
+      margin: 6px 0 10px;
+      word-break: break-all;
+    }
+    #successBox button {
+      display: block;
+      width: 100%;
+      padding: 12px 20px;
+      font-size: 15px;
+      font-weight: 600;
+      border: none;
+      border-radius: 8px;
+      background: #fff;
+      color: #2563eb;
+      border: 2px solid #2563eb;
+      cursor: pointer;
+    }
+    #formWrap.hidden { display: none; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Solicitud de devolución de reserva</h1>
+    <p class="subtitle" id="subtitulo"></p>
+
+    <div id="formWrap">
+      <div class="intro">
+        Rellena estos datos para solicitar la devolución del importe que
+        entregaste como reserva. Revisaremos la solicitud y nos pondremos en
+        contacto contigo. Los campos con <b style="color:#d33">*</b> son
+        obligatorios.
+      </div>
+
+      <label class="req">Nombre y apellidos</label>
+      <input type="text" id="nombre" autocomplete="name" placeholder="Nombre y apellidos del titular">
+
+      <label class="req">Teléfono de contacto</label>
+      <input type="tel" id="telefono" inputmode="tel" autocomplete="tel" placeholder="600 000 000">
+
+      <label class="req">Correo electrónico</label>
+      <input type="email" id="correo" inputmode="email" autocomplete="email" placeholder="nombre@correo.com">
+
+      <label class="req">Fecha de la reserva</label>
+      <input type="date" id="fechaReserva">
+
+      <label class="req">Modalidad de reserva</label>
+      <select id="modalidad">
+        <option value="" disabled selected>Selecciona...</option>
+      </select>
+      <div class="hint">Cómo pagaste la reserva.</div>
+
+      <label class="req">Modelo de la moto</label>
+      <input type="text" id="modelo" placeholder="Marca y modelo">
+
+      <label class="req">Matrícula o código<span class="formato">(1111 AAA o el código de la unidad)</span></label>
+      <input type="text" id="matricula" placeholder="1111 AAA" style="text-transform:uppercase;">
+
+      <label class="req">Nombre del comercial que te atendió</label>
+      <input type="text" id="comercial" placeholder="Nombre del comercial">
+
+      <label class="req">Motivo de la devolución</label>
+      <select id="motivo">
+        <option value="" disabled selected>Selecciona...</option>
+      </select>
+
+      <div id="detalleMotivoWrap" class="oculto">
+        <label class="req">Explica el motivo</label>
+        <input type="text" id="detalleMotivo" placeholder="Cuéntanos brevemente el motivo">
+      </div>
+
+      <label class="req">Importe de la reserva (€)</label>
+      <input type="number" id="importe" inputmode="decimal" step="0.01" min="0" placeholder="0.00">
+
+      <label class="req">Número de cuenta (IBAN)</label>
+      <input type="text" id="iban" placeholder="ES00 0000 0000 0000 0000 0000" style="text-transform:uppercase;">
+      <div class="hint">La cuenta donde quieres recibir la devolución. Tiene que estar a tu nombre.</div>
+
+      <label class="req">Certificado de titularidad de la cuenta</label>
+      <div class="hint" style="margin-bottom:10px;">
+        Documento del banco donde figuras como titular de esa cuenta. Vale un
+        PDF o una foto, hasta <span id="maxMb"></span> MB.
+      </div>
+      <div class="file-btns">
+        <div class="file-btn" id="archivoBtn">📎 Elegir archivo (PDF o imagen)</div>
+        <div class="file-btn" id="cameraBtn">📷 Hacer foto</div>
+      </div>
+      <input type="file" id="fileInputArchivo" accept="application/pdf,image/*">
+      <input type="file" id="fileInputCamera" accept="image/*" capture="environment">
+      <div id="preview"><img id="previewImg"></div>
+      <div id="previewDoc"><span>📄</span><span id="previewDocNombre"></span></div>
+
+      <label class="consent" id="consentWrap">
+        <input type="checkbox" id="consent">
+        <span id="consentTexto"></span>
+      </label>
+
+      <div id="errorBox"></div>
+
+      <button id="submitBtn">Enviar solicitud</button>
+    </div>
+
+    <div id="successBox">
+      <div class="check">✅</div>
+      <p><b>Solicitud registrada.</b><br>
+      Hemos recibido tus datos y el certificado. Revisaremos la solicitud y
+      te avisaremos por teléfono o por correo.</p>
+
+      <div class="codigo-caja">
+        <div class="etiqueta">Código de tu solicitud</div>
+        <div class="valor" id="codigoValor"></div>
+        <button id="copyBtn">📋 Copiar código</button>
+      </div>
+      <p class="hint" style="margin-top:10px;">
+        Guarda este código: es la referencia de tu solicitud si necesitas
+        consultarnos por ella.
+      </p>
+    </div>
+  </div>
+
+  <script>
+    var CONFIG = <?!= config ?>;
+
+    var el = function(id) { return document.getElementById(id); };
+
+    // --- Carga inicial --------------------------------------------------
+    el('subtitulo').textContent = CONFIG.empresa + ' · NIF ' + CONFIG.nif;
+    el('maxMb').textContent = CONFIG.tamanoMaximoMb;
+    CONFIG.modalidades.forEach(function(m) { el('modalidad').appendChild(new Option(m, m)); });
+    CONFIG.motivos.forEach(function(m) { el('motivo').appendChild(new Option(m, m)); });
+    el('consentTexto').textContent = 'Autorizo a ' + CONFIG.empresa + ' a tratar mis datos ' +
+      'personales y bancarios con el fin de gestionar esta solicitud de devolución.';
+
+    var fechaInput = el('fechaReserva');
+    fechaInput.max = new Date().toISOString().slice(0, 10);
+
+    // --- Utilidades -----------------------------------------------------
+    function mostrar(wrapId, visible) {
+      el(wrapId).className = visible ? '' : 'oculto';
+    }
+
+    function showError(msg) {
+      var box = el('errorBox');
+      box.textContent = msg;
+      box.style.display = 'block';
+      box.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+
+    function hideError() { el('errorBox').style.display = 'none'; }
+
+    // --- Motivo: "Otros" pide explicación -------------------------------
+    el('motivo').addEventListener('change', function() {
+      mostrar('detalleMotivoWrap', el('motivo').value === CONFIG.motivoOtros);
+    });
+
+    // --- IBAN -----------------------------------------------------------
+    // Mismo cálculo que en el servidor, para avisar antes de enviar.
+    function normalizarIban(iban) {
+      return String(iban || '').replace(/\s+/g, '').toUpperCase();
+    }
+
+    function ibanValido(iban) {
+      var v = normalizarIban(iban);
+      if (!/^[A-Z]{2}[0-9]{2}[A-Z0-9]{11,30}$/.test(v)) return false;
+      if (v.substring(0, 2) === 'ES' && v.length !== 24) return false;
+
+      var reordenado = v.substring(4) + v.substring(0, 4);
+      var numerico = '';
+      for (var i = 0; i < reordenado.length; i++) {
+        var c = reordenado.charAt(i);
+        numerico += (c >= 'A' && c <= 'Z') ? String(c.charCodeAt(0) - 55) : c;
+      }
+      var resto = 0;
+      for (var j = 0; j < numerico.length; j += 7) {
+        resto = Number(String(resto) + numerico.substring(j, j + 7)) % 97;
+      }
+      return resto === 1;
+    }
+
+    // Se muestra en grupos de cuatro, que es como viene en los documentos
+    // del banco y como el cliente lo puede comparar de un vistazo.
+    el('iban').addEventListener('blur', function() {
+      var v = normalizarIban(el('iban').value);
+      el('iban').value = v.replace(/(.{4})/g, '$1 ').trim();
+    });
+
+    // --- Certificado de titularidad -------------------------------------
+    var file = null;
+    var fileDataUrl = null;
+
+    el('archivoBtn').addEventListener('click', function() { el('fileInputArchivo').click(); });
+    el('cameraBtn').addEventListener('click', function() { el('fileInputCamera').click(); });
+
+    function onFileSelected(e) {
+      var elegido = e.target.files[0];
+      if (!elegido) return;
+
+      var maxBytes = CONFIG.tamanoMaximoMb * 1024 * 1024;
+      if (elegido.size > maxBytes) {
+        return showError('El archivo pesa demasiado. El máximo es ' +
+          CONFIG.tamanoMaximoMb + ' MB.');
+      }
+      hideError();
+
+      file = elegido;
+      var reader = new FileReader();
+      reader.onload = function(ev) {
+        fileDataUrl = ev.target.result;
+        var esImagen = (file.type || '').indexOf('image/') === 0;
+        el('preview').style.display = esImagen ? 'block' : 'none';
+        el('previewDoc').style.display = esImagen ? 'none' : 'flex';
+        if (esImagen) el('previewImg').src = fileDataUrl;
+        else el('previewDocNombre').textContent = file.name;
+      };
+      reader.readAsDataURL(elegido);
+    }
+    el('fileInputArchivo').addEventListener('change', onFileSelected);
+    el('fileInputCamera').addEventListener('change', onFileSelected);
+
+    // --- Consentimiento -------------------------------------------------
+    el('consent').addEventListener('change', function() {
+      el('consentWrap').classList.toggle('selected', el('consent').checked);
+    });
+
+    // --- Envío ----------------------------------------------------------
+    el('submitBtn').addEventListener('click', function() {
+      hideError();
+
+      var nombre = el('nombre').value.trim();
+      var telefono = el('telefono').value.trim();
+      var correo = el('correo').value.trim();
+      var fechaReserva = el('fechaReserva').value;
+      var modalidad = el('modalidad').value;
+      var modelo = el('modelo').value.trim();
+      var matricula = el('matricula').value.trim().toUpperCase();
+      var comercial = el('comercial').value.trim();
+      var motivo = el('motivo').value;
+      var detalleMotivo = el('detalleMotivo').value.trim();
+      var importe = el('importe').value;
+      var iban = normalizarIban(el('iban').value);
+
+      if (!nombre) return showError('Falta tu nombre y apellidos.');
+      if (!telefono) return showError('Falta tu teléfono de contacto.');
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(correo)) {
+        return showError('El correo electrónico no parece válido.');
+      }
+      if (!fechaReserva) return showError('Falta la fecha de la reserva.');
+      if (!modalidad) return showError('Falta indicar la modalidad de la reserva.');
+      if (!modelo) return showError('Falta el modelo de la moto.');
+      if (!matricula) return showError('Falta la matrícula o el código.');
+      if (!comercial) return showError('Falta el nombre del comercial que te atendió.');
+      if (!motivo) return showError('Falta indicar el motivo de la devolución.');
+      if (motivo === CONFIG.motivoOtros && !detalleMotivo) {
+        return showError('Al elegir "Otros" hay que explicar el motivo.');
+      }
+      if (!importe || Number(importe) <= 0) {
+        return showError('El importe de la reserva tiene que ser mayor que cero.');
+      }
+      if (!ibanValido(iban)) {
+        return showError('El número de cuenta (IBAN) no es válido. Revísalo: en ' +
+          'España empieza por ES y tiene 24 caracteres.');
+      }
+      if (!fileDataUrl) {
+        return showError('Falta adjuntar el certificado de titularidad de la cuenta.');
+      }
+      if (!el('consent').checked) {
+        return showError('Hay que autorizar el tratamiento de los datos para poder ' +
+          'gestionar la devolución.');
+      }
+
+      var btn = el('submitBtn');
+      btn.disabled = true;
+      btn.textContent = 'Enviando...';
+
+      google.script.run
+        .withSuccessHandler(function(result) {
+          el('codigoValor').textContent = result.id;
+          el('formWrap').classList.add('hidden');
+          el('successBox').style.display = 'block';
+        })
+        .withFailureHandler(function(err) {
+          btn.disabled = false;
+          btn.textContent = 'Enviar solicitud';
+          showError('No se pudo enviar: ' + (err && err.message ? err.message : err));
+        })
+        .submitDevolucion({
+          nombre: nombre,
+          telefono: telefono,
+          correo: correo,
+          fechaReserva: fechaReserva,
+          modalidad: modalidad,
+          modelo: modelo,
+          matricula: matricula,
+          comercial: comercial,
+          motivo: motivo,
+          detalleMotivo: detalleMotivo,
+          importe: importe,
+          iban: iban,
+          fileBase64: fileDataUrl.split(',')[1],
+          fileMimeType: file.type || 'image/jpeg',
+          fileName: file.name || '',
+        });
+    });
+
+    // --- Copiar el código -----------------------------------------------
+    el('copyBtn').addEventListener('click', function() {
+      var texto = el('codigoValor').textContent;
+      var btn = el('copyBtn');
+
+      function ok() {
+        btn.textContent = '✅ Copiado';
+        setTimeout(function() { btn.textContent = '📋 Copiar código'; }, 2000);
+      }
+
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(texto).then(ok, copiarConSeleccion);
+      } else {
+        copiarConSeleccion();
+      }
+
+      // El portapapeles moderno no siempre está permitido dentro del marco
+      // en el que Apps Script publica la página; este es el camino de siempre.
+      function copiarConSeleccion() {
+        var input = document.createElement('textarea');
+        input.value = texto;
+        input.style.position = 'fixed';
+        input.style.opacity = '0';
+        document.body.appendChild(input);
+        input.select();
+        try { document.execCommand('copy'); ok(); } catch (err) {
+          btn.textContent = 'Copia el código a mano';
+        }
+        document.body.removeChild(input);
+      }
+    });
+  </script>
+</body>
+</html>
