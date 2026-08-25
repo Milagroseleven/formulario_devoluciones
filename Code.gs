@@ -8,24 +8,28 @@
  * A diferencia del formulario de caja, aquí quien escribe es una persona
  * externa a la empresa, así que el formulario es público (sin login) y
  * todos los textos están redactados para el cliente.
+ *
+ * Las cuatro últimas columnas de la hoja no las rellena el cliente: son el
+ * seguimiento interno que lleva el encargado a mano (ver SEGUIMIENTO).
  */
 
 // ---------------------------------------------------------------------
 // CONFIGURACIÓN
 //
-//   CARPETA_ID  : ID de la carpeta de Drive donde se guardan los
-//                 certificados de titularidad. Si se deja vacío, se busca
-//                 (o se crea) una carpeta llamada CARPETA_NOMBRE en la
-//                 unidad de la cuenta que despliega el formulario.
-//   NOTIFICAR_A : correo (o correos separados por coma) que recibe un
-//                 aviso con cada solicitud. Vacío = no se envía nada.
+//   CARPETA_ID : ID de la carpeta de Drive donde se guardan los
+//                certificados de titularidad. Si se deja vacío, se busca
+//                (o se crea) una carpeta llamada CARPETA_NOMBRE en la
+//                unidad de la cuenta que despliega el formulario.
+//   HOJA_ID    : ID del Google Sheet que recibe las solicitudes. Si se
+//                deja vacío, se usa la hoja en la que vive este script.
 //
-// El ID es el trozo largo de la URL de la carpeta:
-//   drive.google.com/drive/folders/ESTO_ES_EL_ID
+// El ID es el trozo largo de la URL:
+//   carpeta -> drive.google.com/drive/folders/ESTO_ES_EL_ID
+//   hoja    -> docs.google.com/spreadsheets/d/ESTO_ES_EL_ID/edit
 // ---------------------------------------------------------------------
 const CARPETA_ID = '';
 const CARPETA_NOMBRE = 'Devoluciones de reservas';
-const NOTIFICAR_A = '';
+const HOJA_ID = '1bi7olbGvhe0rogClo0jC5PAmNgkLTPHWMXm9fOSHq2A';
 
 const SHEET_NAME = 'Solicitudes';
 
@@ -54,6 +58,24 @@ const MOTIVOS = [
 const MIME_ADMITIDOS = ['application/pdf', 'image/jpeg', 'image/png', 'image/heic', 'image/webp'];
 const TAMANO_MAXIMO_MB = 10;
 
+// ---------------------------------------------------------------------
+// SEGUIMIENTO INTERNO (las cuatro últimas columnas)
+//
+// Toda solicitud nace en "Pendiente". Cuando el encargado la pasa a
+// "Devolución efectuada", las tres columnas siguientes dejan de ser
+// opcionales: onEdit las marca en rojo y avisa hasta que estén rellenas.
+// ---------------------------------------------------------------------
+const ESTADO_PENDIENTE = 'Pendiente';
+const ESTADO_EFECTUADA = 'Devolución efectuada';
+const ESTADOS = [ESTADO_PENDIENTE, ESTADO_EFECTUADA];
+
+const JUSTIFICANTE_OPCIONES = ['Ok', 'Pendiente'];
+
+const COL_ESTADO_NOMBRE = 'Estado devolución';
+const COL_FECHA_NOMBRE = 'Fecha transferencia';
+const COL_IMPORTE_NOMBRE = 'Importe';
+const COL_JUSTIFICANTE_NOMBRE = 'Justificante enviado al comercial';
+
 const HEADERS = [
   'Fecha registro',
   'ID solicitud',
@@ -67,14 +89,25 @@ const HEADERS = [
   'Comercial',
   'Motivo de la devolución',
   'Detalle del motivo',
-  'Importe de la reserva (EUR)',
   'Número de cuenta (IBAN)',
   'Certificado de titularidad (Drive)',
-  'Estado',
+  COL_ESTADO_NOMBRE,
+  COL_FECHA_NOMBRE,
+  COL_IMPORTE_NOMBRE,
+  COL_JUSTIFICANTE_NOMBRE,
 ];
 
-// Valor con el que nace toda solicitud; contabilidad lo va cambiando a mano.
-const ESTADO_INICIAL = 'Pendiente de revisar';
+// Posiciones (1 = columna A) de las columnas de seguimiento.
+const COL_ESTADO = HEADERS.indexOf(COL_ESTADO_NOMBRE) + 1;
+const COL_FECHA = HEADERS.indexOf(COL_FECHA_NOMBRE) + 1;
+const COL_IMPORTE = HEADERS.indexOf(COL_IMPORTE_NOMBRE) + 1;
+const COL_JUSTIFICANTE = HEADERS.indexOf(COL_JUSTIFICANTE_NOMBRE) + 1;
+
+const FONDO_FALTA = '#fde8e8';
+const NOTA_FALTA = 'Obligatorio al marcar "' + ESTADO_EFECTUADA + '".';
+
+// Hasta qué fila se dejan preparadas las listas desplegables.
+const FILAS_PREPARADAS = 2000;
 
 function doGet() {
   const t = HtmlService.createTemplateFromFile('Index');
@@ -105,9 +138,20 @@ function getCarpeta_() {
   return DriveApp.createFolder(CARPETA_NOMBRE);
 }
 
+function getLibro_() {
+  if (HOJA_ID) {
+    try {
+      return SpreadsheetApp.openById(HOJA_ID);
+    } catch (err) {
+      throw new Error('No se pudo abrir la hoja configurada. Revisa HOJA_ID.');
+    }
+  }
+  return SpreadsheetApp.getActiveSpreadsheet();
+}
+
 /** Devuelve la pestaña de solicitudes, creándola con cabeceras. */
 function getHojaSolicitudes_() {
-  const libro = SpreadsheetApp.getActiveSpreadsheet();
+  const libro = getLibro_();
   let sheet = libro.getSheetByName(SHEET_NAME);
   if (!sheet) {
     sheet = libro.insertSheet(SHEET_NAME);
@@ -115,9 +159,118 @@ function getHojaSolicitudes_() {
   if (sheet.getLastRow() === 0) {
     sheet.appendRow(HEADERS);
     sheet.setFrozenRows(1);
+    sheet.getRange(1, 1, 1, HEADERS.length).setFontWeight('bold');
     sheet.autoResizeColumns(1, HEADERS.length);
+    prepararSeguimiento_(sheet);
   }
   return sheet;
+}
+
+/**
+ * Deja listas las columnas de seguimiento: desplegables, formato de fecha
+ * y formato de importe. Se aplica de golpe hasta FILAS_PREPARADAS para que
+ * las solicitudes nuevas ya lleguen con todo puesto.
+ */
+function prepararSeguimiento_(sheet) {
+  const filas = FILAS_PREPARADAS - 1;
+
+  const validacionEstado = SpreadsheetApp.newDataValidation()
+    .requireValueInList(ESTADOS, true)
+    .setAllowInvalid(false)
+    .setHelpText('Al marcar "' + ESTADO_EFECTUADA + '" hay que rellenar la fecha, ' +
+      'el importe y el justificante.')
+    .build();
+  sheet.getRange(2, COL_ESTADO, filas, 1).setDataValidation(validacionEstado);
+
+  const validacionJustificante = SpreadsheetApp.newDataValidation()
+    .requireValueInList(JUSTIFICANTE_OPCIONES, true)
+    .setAllowInvalid(false)
+    .build();
+  sheet.getRange(2, COL_JUSTIFICANTE, filas, 1).setDataValidation(validacionJustificante);
+
+  sheet.getRange(2, COL_FECHA, filas, 1).setNumberFormat('dd/mm/yyyy');
+  sheet.getRange(2, COL_IMPORTE, filas, 1).setNumberFormat('#,##0.00 €');
+}
+
+/** Menú propio de la hoja, para poder relanzar la configuración a mano. */
+function onOpen() {
+  SpreadsheetApp.getUi()
+    .createMenu('Devoluciones')
+    .addItem('Preparar columnas de seguimiento', 'configurarHoja')
+    .addItem('Revisar devoluciones incompletas', 'revisarTodo')
+    .addToUi();
+}
+
+/** Se ejecuta a mano desde el menú, o una sola vez tras instalar. */
+function configurarHoja() {
+  const sheet = getHojaSolicitudes_();
+  prepararSeguimiento_(sheet);
+  revisarTodo();
+  sheet.getParent().toast('Columnas de seguimiento preparadas.', 'Devoluciones', 5);
+}
+
+/**
+ * Marca en rojo, en toda la hoja, lo que falte por rellenar en las
+ * devoluciones ya marcadas como efectuadas.
+ */
+function revisarTodo() {
+  const sheet = getHojaSolicitudes_();
+  const ultima = sheet.getLastRow();
+  let incompletas = 0;
+  for (let fila = 2; fila <= ultima; fila++) {
+    if (revisarFila_(sheet, fila)) incompletas++;
+  }
+  sheet.getParent().toast(
+    incompletas === 0
+      ? 'Todas las devoluciones efectuadas están completas.'
+      : 'Hay ' + incompletas + ' devolución(es) efectuada(s) con datos sin rellenar.',
+    'Devoluciones', 6);
+}
+
+/**
+ * Revisa una fila y devuelve true si le falta algo. Las celdas que faltan
+ * quedan en rojo y con una nota; las que ya están, limpias.
+ */
+function revisarFila_(sheet, fila) {
+  const estado = sheet.getRange(fila, COL_ESTADO).getValue();
+  const columnas = [COL_FECHA, COL_IMPORTE, COL_JUSTIFICANTE];
+  const exigir = estado === ESTADO_EFECTUADA;
+  let faltan = 0;
+
+  for (let i = 0; i < columnas.length; i++) {
+    const celda = sheet.getRange(fila, columnas[i]);
+    const vacia = celda.getValue() === '' || celda.getValue() === null;
+    if (exigir && vacia) {
+      celda.setBackground(FONDO_FALTA).setNote(NOTA_FALTA);
+      faltan++;
+    } else {
+      celda.setBackground(null).clearNote();
+    }
+  }
+  return faltan > 0;
+}
+
+/**
+ * Disparador simple: salta con cada edición manual de la hoja. Solo mira
+ * las cuatro columnas de seguimiento, para no ralentizar el resto.
+ */
+function onEdit(e) {
+  if (!e || !e.range) return;
+  const sheet = e.range.getSheet();
+  if (sheet.getName() !== SHEET_NAME) return;
+
+  const fila = e.range.getRow();
+  const columna = e.range.getColumn();
+  if (fila < 2) return;
+  if ([COL_ESTADO, COL_FECHA, COL_IMPORTE, COL_JUSTIFICANTE].indexOf(columna) === -1) return;
+
+  const faltan = revisarFila_(sheet, fila);
+  if (faltan) {
+    sheet.getParent().toast(
+      'Marcaste "' + ESTADO_EFECTUADA + '": faltan por rellenar los campos en rojo ' +
+      '(fecha de transferencia, importe y justificante).',
+      'Fila ' + fila + ' incompleta', 8);
+  }
 }
 
 function sanitize_(s) {
@@ -172,33 +325,9 @@ function extensionDe_(mimeType, nombreOriginal) {
   return '.jpg';
 }
 
-/** Aviso al equipo de administración, si hay destinatario configurado. */
-function avisar_(id, d) {
-  if (!NOTIFICAR_A) return;
-  const cuerpo = [
-    'Nueva solicitud de devolución de reserva.',
-    '',
-    'ID: ' + id,
-    'Cliente: ' + d.nombre,
-    'Teléfono: ' + d.telefono,
-    'Correo: ' + d.correo,
-    'Reserva: ' + d.fechaReserva + ' - ' + d.modalidad,
-    'Moto: ' + d.modelo + ' (' + d.matricula + ')',
-    'Comercial: ' + d.comercial,
-    'Motivo: ' + d.motivo + (d.detalleMotivo ? ' - ' + d.detalleMotivo : ''),
-  ].join('\n');
-  try {
-    MailApp.sendEmail(NOTIFICAR_A, 'Devolución de reserva ' + id + ' - ' + d.nombre, cuerpo);
-  } catch (err) {
-    // Un fallo en el aviso no puede tumbar el registro: la fila ya está
-    // guardada, que es lo que de verdad importa.
-    console.error('No se pudo enviar el aviso: ' + err);
-  }
-}
-
 /**
  * data: {nombre, telefono, correo, fechaReserva, modalidad, modelo,
- *        matricula, comercial, motivo, detalleMotivo, importe, iban,
+ *        matricula, comercial, motivo, detalleMotivo, iban,
  *        fileBase64, fileMimeType, fileName}
  *
  * Se vuelve a validar todo aquí aunque el formulario ya lo haya hecho: la
@@ -234,11 +363,6 @@ function submitDevolucion(data) {
   if (data.motivo === MOTIVO_OTROS && !detalleMotivo) {
     throw new Error('Al elegir "Otros" hay que explicar el motivo.');
   }
-
-  const importe = Number(data.importe);
-  if (!importe || importe <= 0) {
-    throw new Error('El importe de la reserva tiene que ser mayor que cero.');
-  }
   if (!ibanValido_(iban)) {
     throw new Error('El número de cuenta (IBAN) no es válido. Revísalo: en España empieza por ES y tiene 24 caracteres.');
   }
@@ -263,7 +387,8 @@ function submitDevolucion(data) {
   const blob = Utilities.newBlob(decoded, data.fileMimeType, nombreArchivo);
   const fileUrl = getCarpeta_().createFile(blob).getUrl();
 
-  getHojaSolicitudes_().appendRow([
+  const sheet = getHojaSolicitudes_();
+  sheet.appendRow([
     ahora,
     id,
     nombre,
@@ -276,24 +401,13 @@ function submitDevolucion(data) {
     comercial,
     data.motivo,
     detalleMotivo,
-    importe,
     iban,
     fileUrl,
-    ESTADO_INICIAL,
+    ESTADO_PENDIENTE,
+    '',
+    '',
+    '',
   ]);
-
-  avisar_(id, {
-    nombre: nombre,
-    telefono: telefono,
-    correo: correo,
-    fechaReserva: data.fechaReserva,
-    modalidad: data.modalidad,
-    modelo: modelo,
-    matricula: matricula,
-    comercial: comercial,
-    motivo: data.motivo,
-    detalleMotivo: detalleMotivo,
-  });
 
   return { id: id };
 }

@@ -223,9 +223,6 @@
         <input type="text" id="detalleMotivo" placeholder="Cuéntanos brevemente el motivo">
       </div>
 
-      <label class="req">Importe de la reserva (€)</label>
-      <input type="number" id="importe" inputmode="decimal" step="0.01" min="0" placeholder="0.00">
-
       <label class="req">Número de cuenta (IBAN)</label>
       <input type="text" id="iban" placeholder="ES00 0000 0000 0000 0000 0000" style="text-transform:uppercase;">
       <div class="hint">La cuenta donde quieres recibir la devolución. Tiene que estar a tu nombre.</div>
@@ -390,7 +387,6 @@
       var comercial = el('comercial').value.trim();
       var motivo = el('motivo').value;
       var detalleMotivo = el('detalleMotivo').value.trim();
-      var importe = el('importe').value;
       var iban = normalizarIban(el('iban').value);
 
       if (!nombre) return showError('Falta tu nombre y apellidos.');
@@ -406,9 +402,6 @@
       if (!motivo) return showError('Falta indicar el motivo de la devolución.');
       if (motivo === CONFIG.motivoOtros && !detalleMotivo) {
         return showError('Al elegir "Otros" hay que explicar el motivo.');
-      }
-      if (!importe || Number(importe) <= 0) {
-        return showError('El importe de la reserva tiene que ser mayor que cero.');
       }
       if (!ibanValido(iban)) {
         return showError('El número de cuenta (IBAN) no es válido. Revísalo: en ' +
@@ -448,7 +441,6 @@
           comercial: comercial,
           motivo: motivo,
           detalleMotivo: detalleMotivo,
-          importe: importe,
           iban: iban,
           fileBase64: fileDataUrl.split(',')[1],
           fileMimeType: file.type || 'image/jpeg',

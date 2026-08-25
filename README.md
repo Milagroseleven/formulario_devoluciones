@@ -31,29 +31,56 @@ derivados y con los textos redactados para una persona externa a la empresa.
 | 8 | Nombre del comercial | Sí | Quien atendió al cliente |
 | 9 | Motivo de la devolución | Sí | Cancelación de financiación · Desistimiento · Motivos personales · Otros |
 | 10 | Explica el motivo | Solo si el motivo es "Otros" | Aparece únicamente al elegir "Otros" |
-| 11 | Importe de la reserva (€) | Sí | Normalmente entre 200 y 250 €, pero admite cualquier importe |
-| 12 | Número de cuenta (IBAN) | Sí | Se valida con el dígito de control (ISO 13616) |
-| 13 | Certificado de titularidad | Sí | PDF o imagen, hasta 10 MB |
-| 14 | Autorización de tratamiento de datos | Sí | Casilla de consentimiento |
+| 11 | Número de cuenta (IBAN) | Sí | Se valida con el dígito de control (ISO 13616) |
+| 12 | Certificado de titularidad | Sí | PDF o imagen, hasta 10 MB |
+| 13 | Autorización de tratamiento de datos | Sí | Casilla de consentimiento |
 
-Los campos 11 y 14 no estaban en la lista inicial: se añadieron porque sin
-importe no se puede cuadrar la devolución, y porque el formulario es público
-y recoge datos bancarios. Quitarlos es fácil si no hacen falta.
+El cliente **no indica el importe**: lo cruza administración con sus propios
+registros, para que nadie pueda declarar una cifra que no corresponde. El
+campo 13 no estaba en la lista inicial; se añadió porque el formulario es
+público y recoge datos bancarios.
 
 ## Cómo se guarda cada solicitud
 
 - **Sheet**, pestaña `Solicitudes`: una fila por solicitud, con la fecha de
-  registro, el ID, todos los campos, el enlace al certificado y una columna
-  `Estado` que nace como `Pendiente de revisar` para que administración la
-  vaya actualizando a mano.
+  registro, el ID, los datos del cliente, el enlace al certificado y las
+  cuatro columnas de seguimiento interno.
 - **Drive**, carpeta `Devoluciones de reservas`: el certificado, con el
   nombre `<matrícula> - Certificado titularidad - <cliente> - <ID>.<ext>`.
 - **ID de solicitud**: `DEV-<aaaammdd>-<4 caracteres>`. Se le muestra al
   cliente al terminar, con un botón para copiarlo.
 
+## Seguimiento interno (las 4 últimas columnas)
+
+Estas columnas no las toca el cliente: las lleva el encargado a mano sobre
+la propia hoja. No hace falta ningún aviso automático; el encargado revisa
+las filas en `Pendiente` y las va cerrando.
+
+| Columna | Cómo funciona |
+| --- | --- |
+| `Estado devolución` | Desplegable `Pendiente` / `Devolución efectuada`. Toda solicitud nueva entra como `Pendiente` |
+| `Fecha transferencia` | Fecha a mano, formato `dd/mm/aaaa` |
+| `Importe` | Importe devuelto, formato euros |
+| `Justificante enviado al comercial` | Desplegable `Ok` / `Pendiente` |
+
+Al pasar una fila a **`Devolución efectuada`**, las otras tres columnas se
+vuelven obligatorias: las que estén vacías se pintan de rojo, les aparece
+una nota al pasar el ratón y salta un aviso en la esquina de la pantalla.
+El rojo desaparece solo en cuanto se rellenan. Google Sheets no permite
+bloquear una celda de verdad, así que el aviso es visible pero no impide
+seguir trabajando.
+
+En el menú **Devoluciones** de la hoja hay dos opciones:
+
+- *Preparar columnas de seguimiento*: vuelve a aplicar desplegables y
+  formatos (hay que ejecutarla una vez tras instalar el script).
+- *Revisar devoluciones incompletas*: repasa toda la hoja y marca en rojo
+  lo que falte, útil para las filas anteriores a la instalación.
+
 ## Instalación
 
-1. Crear un Google Sheet nuevo (es el que recibirá las solicitudes).
+1. Abrir el Google Sheet que recibe las solicitudes (el que ya está
+   configurado en `HOJA_ID`).
 2. En ese Sheet: **Extensiones → Apps Script**.
 3. Pegar `Code.gs` e `Index.html` (este último con **+ → HTML**, nombre
    `Index`).
@@ -64,6 +91,8 @@ y recoge datos bancarios. Quitarlos es fácil si no hacen falta.
    - Quién tiene acceso: **Cualquier usuario, incluso anónimo**
 6. Autorizar los permisos y copiar el enlace `/exec`: ese es el que se envía
    a los clientes.
+7. Volver al Sheet, recargarlo y ejecutar **Devoluciones → Preparar columnas
+   de seguimiento** una vez.
 
 > Para que un cambio llegue al enlace ya compartido hay que hacer
 > **Implementar → Administrar implementaciones → editar → Nueva versión**.
@@ -76,7 +105,7 @@ Todo lo configurable está al principio de `Code.gs`:
 | Constante | Para qué |
 | --- | --- |
 | `CARPETA_ID` | Carpeta de Drive donde van los certificados. Vacío = se crea `Devoluciones de reservas` en la unidad de quien despliega |
-| `NOTIFICAR_A` | Correo que recibe un aviso con cada solicitud. Vacío = no se envía nada |
+| `HOJA_ID` | Sheet que recibe las solicitudes. Vacío = la hoja en la que vive el script |
 | `EMPRESA` / `NIF` | Aparecen bajo el título del formulario |
 | `MODALIDADES` | Opciones del campo 5 |
 | `MOTIVOS` | Opciones del campo 9 |
@@ -85,9 +114,18 @@ Todo lo configurable está al principio de `Code.gs`:
 Añadir una modalidad o un motivo es tocar una sola lista: el formulario las
 recibe por plantilla y se dibuja solo.
 
+El script tiene que vivir **dentro del propio Sheet** (Extensiones → Apps
+Script): el disparador `onEdit` que vigila las columnas de seguimiento solo
+funciona en la hoja que contiene el script.
+
+## Decidido
+
+- El cliente **no** recibe correo de confirmación: solo ve su código en
+  pantalla.
+- **No** se envía aviso a administración con cada solicitud: el encargado
+  revisa la hoja y actualiza el estado.
+
 ## Pendiente de confirmar
 
 - Texto legal exacto de la casilla de consentimiento (ahora hay una
   redacción provisional) y si hay que enlazar una política de privacidad.
-- Si el cliente debe recibir un correo de confirmación con su código.
-- Si la empresa y el NIF son los correctos para este formulario.
