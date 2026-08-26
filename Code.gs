@@ -27,7 +27,7 @@
 //   carpeta -> drive.google.com/drive/folders/ESTO_ES_EL_ID
 //   hoja    -> docs.google.com/spreadsheets/d/ESTO_ES_EL_ID/edit
 // ---------------------------------------------------------------------
-const CARPETA_ID = '';
+const CARPETA_ID = '1bZkD8uRUFAfH2Ua37aftVmpC7z2nDu8Q';
 const CARPETA_NOMBRE = 'Devoluciones de reservas';
 const HOJA_ID = '1bi7olbGvhe0rogClo0jC5PAmNgkLTPHWMXm9fOSHq2A';
 
