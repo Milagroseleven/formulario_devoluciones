@@ -223,6 +223,45 @@ Eliminar fila) y el archivo de prueba de Drive.
 
 ---
 
+## Cómo enviar el enlace a los clientes
+
+El enlace funciona bien en cualquier navegador, pero **falla si el cliente lo
+abre dentro de WhatsApp**. Al tocar el enlace en el chat, el móvil lo abre en
+un navegador interno de la propia aplicación, y ese navegador bloquea cosas
+que Google necesita. El cliente ve un error de Google Drive que dice *"No se
+puede abrir el archivo en estos momentos"*.
+
+No es un fallo del formulario ni de los permisos: en un navegador normal se
+abre sin problema.
+
+Para evitarlo, manda el enlace acompañado de una instrucción. Este texto se
+puede copiar tal cual:
+
+```
+Hola, para tramitar la devolución de tu reserva necesitamos que rellenes
+este formulario:
+
+<AQUI EL ENLACE>
+
+Dos cosas antes de empezar:
+
+1. Si al tocar el enlace te sale un error de Google, toca los tres puntos
+   de la esquina y elige "Abrir en Safari" (iPhone) o "Abrir en Chrome"
+   (Android). Desde WhatsApp a veces no carga.
+
+2. Ten a mano el certificado de titularidad de tu cuenta bancaria, porque
+   hay que adjuntarlo. Sirve el PDF del banco o una foto.
+```
+
+Si un cliente ya se ha topado con el error, dile que mantenga pulsado el
+enlace en el chat, elija **Copiar**, abra su navegador y lo pegue ahí.
+
+> El mismo error puede salirle a alguien que tenga varias cuentas de Google
+> abiertas en el móvil. La solución es la misma: abrirlo en el navegador, o
+> en una ventana de incógnito.
+
+---
+
 ## Cómo se usa el día a día
 
 **El cliente** recibe el enlace y rellena el formulario. No hay que hacer
@@ -263,6 +302,7 @@ actualiza solo**. Hay que hacer esto:
 
 | Qué ves | Qué pasa |
 | --- | --- |
+| El cliente ve "No se puede abrir el archivo en estos momentos" | Está abriendo el enlace dentro de WhatsApp. Tiene que abrirlo en Safari o Chrome |
 | El formulario sale sin colores, sin títulos y sin campos | El archivo `Index` se pegó incompleto. Bórralo entero y vuelve a pegarlo comprobando que empieza por `<!DOCTYPE html>` y acaba en `</html>` |
 | El cliente ve una pantalla pidiendo iniciar sesión | En el Paso 5 no se eligió la opción más abierta en "Quién tiene acceso". Edita la implementación y cámbialo |
 | Sale "Se ha producido un error en la secuencia de comandos" | Casi siempre es que falta pegar algún archivo, o que el archivo HTML no se llama exactamente `Index` |
