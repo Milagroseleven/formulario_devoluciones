@@ -331,6 +331,30 @@
       mostrar('detalleMotivoWrap', el('motivo').value === CONFIG.motivoOtros);
     });
 
+    // --- Matrícula --------------------------------------------------------
+    // Mismo cálculo que en el servidor, para avisar antes de enviar.
+    var PATRON_MATRICULA = new RegExp(CONFIG.reMatricula);
+    var PATRON_CODIGO = new RegExp(CONFIG.reCodigo);
+
+    function normalizarMatricula(valor) {
+      var t = String(valor || '').toUpperCase().replace(/[^A-Z0-9]+/g, ' ').trim().replace(/\s+/g, ' ');
+      if (!t || t.indexOf(' ') !== -1) return t;
+      // Escrito todo junto: se separan los bloques (1234BCD -> 1234 BCD).
+      var m = t.match(/^(\d{4})([A-Z]{3})$/) || t.match(/^([A-Z]{1,2})(\d{4,6})([A-Z]{0,3})$/);
+      if (!m) return t;
+      return m.slice(1).filter(Boolean).join(' ');
+    }
+
+    function matriculaValida(matricula) {
+      if (PATRON_MATRICULA.test(matricula)) return true;
+      var sinEspacios = matricula.replace(/ /g, '');
+      return PATRON_CODIGO.test(sinEspacios) && /\d/.test(sinEspacios);
+    }
+
+    el('matricula').addEventListener('blur', function() {
+      el('matricula').value = normalizarMatricula(el('matricula').value);
+    });
+
     // --- IBAN -----------------------------------------------------------
     // Mismo cálculo que en el servidor, para avisar antes de enviar.
     function normalizarIban(iban) {
@@ -410,7 +434,7 @@
       var fechaReserva = el('fechaReserva').value;
       var modalidad = el('modalidad').value;
       var modelo = el('modelo').value.trim();
-      var matricula = el('matricula').value.trim().toUpperCase();
+      var matricula = normalizarMatricula(el('matricula').value);
       var comercial = el('comercial').value.trim();
       var motivo = el('motivo').value;
       var detalleMotivo = el('detalleMotivo').value.trim();
@@ -425,6 +449,7 @@
       if (!modalidad) return showError('Falta indicar la modalidad de la reserva.');
       if (!modelo) return showError('Falta el modelo de la moto.');
       if (!matricula) return showError('Falta la matrícula o el código.');
+      if (!matriculaValida(matricula)) return showError(CONFIG.avisoMatricula);
       if (!comercial) return showError('Falta el nombre del comercial que te atendió.');
       if (!motivo) return showError('Falta indicar el motivo de la devolución.');
       if (motivo === CONFIG.motivoOtros && !detalleMotivo) {

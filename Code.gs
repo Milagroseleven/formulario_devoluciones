@@ -58,6 +58,17 @@ const MOTIVOS = [
 const MIME_ADMITIDOS = ['application/pdf', 'image/jpeg', 'image/png', 'image/heic', 'image/webp'];
 const TAMANO_MAXIMO_MB = 10;
 
+// Formato de matrícula española (igual que en el formulario de caja):
+// "1234 BCD" (actual) o "A 1234", "AB 123456", "A 1234 BC" (formatos con
+// letra de provincia). Si en vez de matrícula viene el código interno de
+// una unidad, se admite como alternativa cualquier texto alfanumérico de
+// 3 a 15 caracteres que lleve al menos un dígito, para no bloquear un
+// código legítimo pero sí rechazar algo escrito al azar como "asdasd".
+const RE_MATRICULA = /^(\d{4} [A-Z]{3}|[A-Z]{1,2} \d{4,6}( [A-Z]{1,3})?)$/;
+const RE_CODIGO = /^[A-Z0-9][A-Z0-9-]{2,14}$/;
+const AVISO_MATRICULA = 'La matrícula o el código no parece válido. Escribe la ' +
+  'matrícula (por ejemplo 1234 BCD) o el código de la unidad.';
+
 // ---------------------------------------------------------------------
 // SEGUIMIENTO INTERNO (las cuatro últimas columnas)
 //
@@ -118,6 +129,9 @@ function doGet() {
     motivos: MOTIVOS,
     motivoOtros: MOTIVO_OTROS,
     tamanoMaximoMb: TAMANO_MAXIMO_MB,
+    reMatricula: RE_MATRICULA.source,
+    reCodigo: RE_CODIGO.source,
+    avisoMatricula: AVISO_MATRICULA,
   });
   return t.evaluate()
     .setTitle('Solicitud de devolución de reserva')
@@ -283,6 +297,26 @@ function nuevoId_(fechaRegistro) {
   return 'DEV-' + dia + '-' + sufijo;
 }
 
+/**
+ * Deja la matrícula en mayúsculas y con un solo espacio entre bloques. Si
+ * se escribió toda junta (por ejemplo "1234BCD"), separa los bloques para
+ * que encaje con RE_MATRICULA.
+ */
+function normalizarMatricula_(valor) {
+  let t = String(valor || '').toUpperCase().replace(/[^A-Z0-9]+/g, ' ').trim().replace(/\s+/g, ' ');
+  if (!t || t.indexOf(' ') !== -1) return t;
+  const m = t.match(/^(\d{4})([A-Z]{3})$/) || t.match(/^([A-Z]{1,2})(\d{4,6})([A-Z]{0,3})$/);
+  if (!m) return t;
+  return m.slice(1).filter(Boolean).join(' ');
+}
+
+/** Matrícula española válida, o código interno alfanumérico con algún dígito. */
+function matriculaValida_(matricula) {
+  if (RE_MATRICULA.test(matricula)) return true;
+  const sinEspacios = matricula.replace(/ /g, '');
+  return RE_CODIGO.test(sinEspacios) && /\d/.test(sinEspacios);
+}
+
 /** Quita espacios y pasa a mayúsculas: así se guarda y se compara el IBAN. */
 function normalizarIban_(iban) {
   return String(iban || '').replace(/\s+/g, '').toUpperCase();
@@ -340,7 +374,7 @@ function submitDevolucion(data) {
   const telefono = String(data.telefono || '').trim();
   const correo = String(data.correo || '').trim();
   const modelo = String(data.modelo || '').trim();
-  const matricula = String(data.matricula || '').trim().toUpperCase();
+  const matricula = normalizarMatricula_(data.matricula);
   const comercial = String(data.comercial || '').trim();
   const detalleMotivo = String(data.detalleMotivo || '').trim();
   const iban = normalizarIban_(data.iban);
@@ -356,6 +390,7 @@ function submitDevolucion(data) {
   }
   if (!modelo) throw new Error('Falta el modelo de la moto.');
   if (!matricula) throw new Error('Falta la matrícula o el código.');
+  if (!matriculaValida_(matricula)) throw new Error(AVISO_MATRICULA);
   if (!comercial) throw new Error('Falta el nombre del comercial.');
   if (MOTIVOS.indexOf(data.motivo) === -1) {
     throw new Error('Falta indicar el motivo de la devolución.');
