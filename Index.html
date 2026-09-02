@@ -57,19 +57,6 @@
     .hint { font-size: 12px; color: #888; margin-top: 4px; }
     .oculto { display: none; }
 
-    /* Resultado de comprobar el código de autorización. */
-    #codigoAviso {
-      margin-top: 8px;
-      padding: 10px 12px;
-      border-radius: 8px;
-      font-size: 14px;
-      line-height: 1.45;
-    }
-    #codigoAviso.ok { background: #ecfdf5; color: #065f46; border: 1px solid #6ee7b7; }
-    #codigoAviso.mal { background: #fef2f2; color: #b91c1c; border: 1px solid #fca5a5; }
-    #codigoAviso.esperando { background: #f3f4f6; color: #4b5563; border: 1px solid #d1d5db; }
-    input[readonly] { background: #f3f4f6; color: #4b5563; }
-
     .file-btns { display: flex; flex-direction: column; gap: 10px; }
     .file-btn {
       display: flex;
@@ -219,11 +206,6 @@
         obligatorios.
       </div>
 
-      <label class="req">Código de autorización</label>
-      <input type="text" id="codigo" placeholder="AUT-XXXXXX" style="text-transform:uppercase;">
-      <div class="hint">Te lo facilita la persona de la empresa que ha autorizado tu devolución.</div>
-      <div id="codigoAviso" class="oculto"></div>
-
       <label class="req">Nombre y apellidos</label>
       <input type="text" id="nombre" autocomplete="name" placeholder="Nombre y apellidos del titular">
 
@@ -245,9 +227,8 @@
       <label class="req">Modelo de la moto</label>
       <input type="text" id="modelo" placeholder="Marca y modelo">
 
-      <label class="req">Matrícula</label>
-      <input type="text" id="matricula" placeholder="Se rellena con el código" readonly style="text-transform:uppercase;">
-      <div class="hint">La toma del código de autorización, para que coincida con la moto de tu reserva.</div>
+      <label class="req">Matrícula<span class="formato">(3720 KDV, A 108859, M 8214 YV...)</span></label>
+      <input type="text" id="matricula" placeholder="3720 KDV" style="text-transform:uppercase;">
 
       <label class="req">Nombre del comercial que te atendió</label>
       <input type="text" id="comercial" placeholder="Nombre del comercial">
@@ -350,49 +331,6 @@
       mostrar('detalleMotivoWrap', el('motivo').value === CONFIG.motivoOtros);
     });
 
-    // --- Código de autorización -------------------------------------------
-    // Sin código no hay solicitud: se comprueba nada más escribirlo, para
-    // que nadie rellene el formulario entero y se lleve el chasco al final.
-    // La matrícula sale del propio código, así que el cliente no la escribe.
-    var codigoVerificado = '';
-
-    function pintarAvisoCodigo(clase, texto) {
-      var caja = el('codigoAviso');
-      caja.textContent = texto || '';
-      caja.className = texto ? clase : 'oculto';
-    }
-
-    function comprobarCodigo() {
-      var codigo = el('codigo').value.trim().toUpperCase();
-      el('codigo').value = codigo;
-
-      if (codigo === codigoVerificado) return;
-      codigoVerificado = '';
-      el('matricula').value = '';
-
-      if (!codigo) return pintarAvisoCodigo('', '');
-
-      pintarAvisoCodigo('esperando', 'Comprobando el código...');
-      google.script.run
-        .withSuccessHandler(function(r) {
-          if (r.ok) {
-            codigoVerificado = codigo;
-            el('matricula').value = r.matricula;
-            pintarAvisoCodigo('ok', 'Código correcto. Devolución autorizada para la ' +
-              'matrícula ' + r.matricula + '.');
-          } else {
-            pintarAvisoCodigo('mal', r.mensaje);
-          }
-        })
-        .withFailureHandler(function(err) {
-          pintarAvisoCodigo('mal', 'No se pudo comprobar el código: ' +
-            (err && err.message ? err.message : err));
-        })
-        .verificarCodigo(codigo);
-    }
-
-    el('codigo').addEventListener('blur', comprobarCodigo);
-
     // --- Matrícula --------------------------------------------------------
     // Mismo cálculo que en el servidor, para avisar antes de enviar.
     var PATRON_MATRICULA = new RegExp(CONFIG.reMatricula);
@@ -409,6 +347,10 @@
     function matriculaValida(matricula) {
       return PATRON_MATRICULA.test(matricula);
     }
+
+    el('matricula').addEventListener('blur', function() {
+      el('matricula').value = normalizarMatricula(el('matricula').value);
+    });
 
     // --- IBAN -----------------------------------------------------------
     // Mismo cálculo que en el servidor, para avisar antes de enviar.
@@ -483,7 +425,6 @@
     el('submitBtn').addEventListener('click', function() {
       hideError();
 
-      var codigo = el('codigo').value.trim().toUpperCase();
       var nombre = el('nombre').value.trim();
       var telefono = el('telefono').value.trim();
       var correo = el('correo').value.trim();
@@ -496,11 +437,6 @@
       var detalleMotivo = el('detalleMotivo').value.trim();
       var iban = normalizarIban(el('iban').value);
 
-      if (!codigo) return showError('Falta el código de autorización.');
-      if (codigo !== codigoVerificado) {
-        return showError('El código de autorización no está comprobado o no es ' +
-          'válido. Revísalo antes de enviar.');
-      }
       if (!nombre) return showError('Falta tu nombre y apellidos.');
       if (!telefono) return showError('Falta tu teléfono de contacto.');
       if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(correo)) {
@@ -544,7 +480,6 @@
           showError('No se pudo enviar: ' + (err && err.message ? err.message : err));
         })
         .submitDevolucion({
-          codigo: codigo,
           nombre: nombre,
           telefono: telefono,
           correo: correo,

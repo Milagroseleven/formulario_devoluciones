@@ -22,14 +22,13 @@ derivados y con los textos redactados para una persona externa a la empresa.
 
 | # | Campo | Obligatorio | Notas |
 | --- | --- | --- | --- |
-| 0 | Código de autorización | Sí | Sin él no se puede enviar. Lo crea una de las personas autorizadas |
 | 1 | Nombre y apellidos | Sí | Titular de la cuenta |
 | 2 | Teléfono de contacto | Sí | |
 | 3 | Correo electrónico | Sí | Se valida el formato |
 | 4 | Fecha de la reserva | Sí | No admite fechas futuras |
 | 5 | Modalidad de reserva | Sí | TPV datáfono · Cash · Reserva por la web · Transferencia a cuenta · Bizum a número de móvil |
 | 6 | Modelo de la moto | Sí | |
-| 7 | Matrícula | Sí | No la escribe el cliente: se rellena sola desde el código de autorización |
+| 7 | Matrícula | Sí | Valida el formato: 3720 KDV, A 108859, M 8214 YV, C 2107 BWM, con el número de unidad opcional al final |
 | 8 | Nombre del comercial | Sí | Quien atendió al cliente |
 | 9 | Motivo de la devolución | Sí | Cancelación de financiación · Desistimiento · Motivos personales · Otros |
 | 10 | Explica el motivo | Solo si el motivo es "Otros" | Aparece únicamente al elegir "Otros" |
@@ -52,31 +51,29 @@ público y recoge datos bancarios.
 - **ID de solicitud**: `DEV-<aaaammdd>-<4 caracteres>`. Se le muestra al
   cliente al terminar, con un botón para copiarlo.
 
-## Códigos de autorización
+## Quién puede autorizar una devolución
 
-El formulario es público, así que cualquiera con el enlace podría pedir una
-devolución que no le corresponde. Para evitarlo, **sin código no se puede
-enviar**.
+Cualquiera con el enlace puede **solicitar** una devolución, pero eso no
+mueve dinero. El dinero solo sale cuando una de las cuatro personas
+autorizadas pone su nombre en la columna **`Autorización`**.
 
-El código lo crea una de las personas autorizadas desde el menú
-**Devoluciones → Crear código de autorización** del propio Sheet. Pide la
-matrícula y el nombre del cliente, y devuelve un código tipo `AUT-K7M2QP`
-para pasárselo al cliente junto con el enlace.
+Esa columna está **protegida por Google**: quien no esté en la lista no
+puede escribir en ella, aunque tenga permiso de edición sobre el resto del
+Sheet. No es un aviso del script, es el propio Google quien lo impide.
 
-Cada código:
+Los autorizados se configuran en la constante `AUTORIZADORES` de `Code.gs`,
+con su nombre y el correo de su cuenta de Google. Después hay que ejecutar
+**Devoluciones → Preparar columnas de seguimiento** para que se aplique.
 
-- Va **ligado a una matrícula**. El cliente no escribe la matrícula: sale
-  del código, así que no puede pedir la devolución de otra moto.
-- **Sirve una sola vez.** Al enviarse la solicitud queda marcado como usado,
-  con el ID de la solicitud que lo gastó.
-- **Caduca a los 30 días** (constante `DIAS_VALIDEZ_CODIGO`).
-- Registra **quién lo creó**, y ese nombre se copia a la solicitud en la
-  columna `Autorizado por`.
+Además, no se puede marcar una devolución como efectuada sin haberla
+autorizado antes: si la columna `Autorización` está vacía, se pinta en rojo
+igual que el resto de campos obligatorios.
 
-Todo esto vive en una pestaña propia del Sheet, `Autorizaciones`. Es la
-trazabilidad de quién autorizó cada devolución.
+> **Una limitación que conviene conocer:** al dueño del Sheet no se le puede
+> dejar fuera. Google siempre permite al propietario editar cualquier celda
+> de su propio archivo, esté protegida o no.
 
-## Seguimiento interno (las 4 últimas columnas)
+## Seguimiento interno (las 5 últimas columnas)
 
 Estas columnas no las toca el cliente: las lleva el encargado a mano sobre
 la propia hoja. No hace falta ningún aviso automático; el encargado revisa
@@ -84,22 +81,21 @@ las filas en `Pendiente` y las va cerrando.
 
 | Columna | Cómo funciona |
 | --- | --- |
+| `Autorización` | Desplegable con los nombres de las cuatro personas autorizadas. Columna protegida: solo ellas pueden escribir |
 | `Estado devolución` | Desplegable `Pendiente` / `Devolución efectuada` / `Devolución denegada`. Toda solicitud nueva entra como `Pendiente` |
 | `Fecha transferencia` | Fecha a mano, formato `dd/mm/aaaa` |
 | `Importe` | Importe devuelto, formato euros |
 | `Justificante enviado al comercial` | Desplegable `Ok` / `Pendiente` |
 
-Al pasar una fila a **`Devolución efectuada`**, las otras tres columnas se
+Al pasar una fila a **`Devolución efectuada`**, las otras cuatro columnas se
 vuelven obligatorias: las que estén vacías se pintan de rojo, les aparece
 una nota al pasar el ratón y salta un aviso en la esquina de la pantalla.
 El rojo desaparece solo en cuanto se rellenan. Google Sheets no permite
 bloquear una celda de verdad, así que el aviso es visible pero no impide
 seguir trabajando.
 
-En el menú **Devoluciones** de la hoja hay tres opciones:
+En el menú **Devoluciones** de la hoja hay dos opciones:
 
-- *Crear código de autorización*: el paso previo a que un cliente pueda
-  pedir su devolución.
 - *Preparar columnas de seguimiento*: reescribe las cabeceras y vuelve a
   aplicar desplegables y formatos (hay que ejecutarla una vez tras instalar
   el script, y también después de cada cambio que añada columnas).
@@ -142,7 +138,7 @@ Todo lo configurable está al principio de `Code.gs`:
 | `MODALIDADES` | Opciones del campo 5 |
 | `MOTIVOS` | Opciones del campo 9 |
 | `TAMANO_MAXIMO_MB` | Peso máximo del certificado |
-| `DIAS_VALIDEZ_CODIGO` | Días que vale un código de autorización desde que se crea |
+| `AUTORIZADORES` | Las cuatro personas que pueden autorizar, con su correo de Google |
 
 Añadir una modalidad o un motivo es tocar una sola lista: el formulario las
 recibe por plantilla y se dibuja solo.
