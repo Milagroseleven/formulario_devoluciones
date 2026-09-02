@@ -54,7 +54,7 @@ público y recoge datos bancarios.
 ## Quién puede autorizar una devolución
 
 Cualquiera con el enlace puede **solicitar** una devolución, pero eso no
-mueve dinero. El dinero solo sale cuando una de las cuatro personas
+mueve dinero. El dinero solo sale cuando una de las personas
 autorizadas pone su nombre en la columna **`Autorización`**.
 
 Esa columna está **protegida por Google**: quien no esté en la lista no
@@ -62,8 +62,13 @@ puede escribir en ella, aunque tenga permiso de edición sobre el resto del
 Sheet. No es un aviso del script, es el propio Google quien lo impide.
 
 Los autorizados se configuran en la constante `AUTORIZADORES` de `Code.gs`,
-con su nombre y el correo de su cuenta de Google. Después hay que ejecutar
-**Devoluciones → Preparar columnas de seguimiento** para que se aplique.
+con su nombre y sus cuentas de Google. Hoy son **Jaime, Gon y Nacho**; Gon
+puede autorizar desde cualquiera de sus dos cuentas. Después de cambiar la
+lista hay que ejecutar **Devoluciones → Preparar columnas de seguimiento**
+para que se aplique.
+
+Estar en la lista no da acceso al Sheet: cada una de esas cuentas necesita
+además permiso de edición sobre el archivo, o no podrá ni abrirlo.
 
 Además, no se puede marcar una devolución como efectuada sin haberla
 autorizado antes: si la columna `Autorización` está vacía, se pinta en rojo
@@ -81,7 +86,7 @@ las filas en `Pendiente` y las va cerrando.
 
 | Columna | Cómo funciona |
 | --- | --- |
-| `Autorización` | Desplegable con los nombres de las cuatro personas autorizadas. Columna protegida: solo ellas pueden escribir |
+| `Autorización` | Desplegable con los nombres de las personas autorizadas. Columna protegida: solo ellas pueden escribir |
 | `Estado devolución` | Desplegable `Pendiente` / `Devolución efectuada` / `Devolución denegada`. Toda solicitud nueva entra como `Pendiente` |
 | `Fecha transferencia` | Fecha a mano, formato `dd/mm/aaaa` |
 | `Importe` | Importe devuelto, formato euros |
@@ -138,7 +143,7 @@ Todo lo configurable está al principio de `Code.gs`:
 | `MODALIDADES` | Opciones del campo 5 |
 | `MOTIVOS` | Opciones del campo 9 |
 | `TAMANO_MAXIMO_MB` | Peso máximo del certificado |
-| `AUTORIZADORES` | Las cuatro personas que pueden autorizar, con su correo de Google |
+| `AUTORIZADORES` | Quién puede autorizar, con sus cuentas de Google (una persona puede tener varias) |
 
 Añadir una modalidad o un motivo es tocar una sola lista: el formulario las
 recibe por plantilla y se dibuja solo.

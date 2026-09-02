@@ -43,17 +43,21 @@ const NIF = 'B72770191';
 // hoja: el script protege esa columna y deja fuera a todos los demás, aun
 // teniendo permiso de edición sobre el resto del Sheet.
 //
-// El correo tiene que ser el de su cuenta de Google, tal cual. El nombre
-// es lo que aparece en el desplegable de la celda.
+// El nombre es lo que aparece en el desplegable de la celda. Los correos
+// son las cuentas de Google desde las que esa persona puede autorizar:
+// quien use más de una cuenta las pone todas.
+//
+// Ojo: estar en esta lista no da acceso al Sheet. Cada una de estas
+// cuentas tiene que tener además permiso de edición sobre el archivo, o no
+// podrá ni abrirlo.
 //
 // Al cambiar esta lista hay que volver a ejecutar
 // "Devoluciones -> Preparar columnas de seguimiento" para que se aplique.
 // ---------------------------------------------------------------------
 const AUTORIZADORES = [
-  { nombre: 'PENDIENTE 1', correo: '' },
-  { nombre: 'PENDIENTE 2', correo: '' },
-  { nombre: 'PENDIENTE 3', correo: '' },
-  { nombre: 'PENDIENTE 4', correo: '' },
+  { nombre: 'Jaime', correos: ['jaime@motickfamily.com'] },
+  { nombre: 'Gon', correos: ['gonzalo@motickfamily.com', 'gonzalo.garnelo@gmail.com'] },
+  { nombre: 'Nacho', correos: ['nacho.carrion@motickfamily.com'] },
 ];
 
 // Modalidad por la que el cliente pagó la reserva que ahora reclama.
@@ -219,8 +223,15 @@ function getHojaSolicitudes_() {
 /** Nombres de los autorizadores, para el desplegable de la celda. */
 function nombresAutorizadores_() {
   return AUTORIZADORES
-    .filter(function(a) { return a.correo; })
+    .filter(function(a) { return correosDe_(a).length; })
     .map(function(a) { return a.nombre; });
+}
+
+/** Los correos de una persona, limpios y sin huecos. */
+function correosDe_(autorizador) {
+  return (autorizador.correos || [])
+    .map(function(c) { return String(c || '').trim(); })
+    .filter(Boolean);
 }
 
 /**
@@ -232,9 +243,9 @@ function nombresAutorizadores_() {
  * deja editar lo que quiera de su propio archivo.
  */
 function protegerAutorizacion_(sheet) {
-  const correos = AUTORIZADORES
-    .map(function(a) { return String(a.correo || '').trim(); })
-    .filter(Boolean);
+  const correos = AUTORIZADORES.reduce(function(acc, a) {
+    return acc.concat(correosDe_(a));
+  }, []);
 
   // Sin la lista rellenada no se protege nada: es preferible dejar la
   // columna abierta a bloqueársela a todo el mundo por accidente.

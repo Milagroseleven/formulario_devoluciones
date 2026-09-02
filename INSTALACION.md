@@ -86,7 +86,7 @@ línea lleva su número a la izquierda:
 - Sube del todo con `Ctrl + Inicio`. La **línea 1** tiene que empezar por
   `/**`.
 - Baja del todo con `Ctrl + Fin`. La última línea tiene que ser `}` y el
-  número de línea rondar el **554**.
+  número de línea rondar el **565**.
 
 Si el número final es mucho menor, el pegado se quedó a medias: borra todo
 y repite.
@@ -265,32 +265,37 @@ enlace en el chat, elija **Copiar**, abra su navegador y lo pegue ahí.
 ## Quién puede autorizar una devolución
 
 Cualquiera con el enlace puede rellenar el formulario, pero **eso no es una
-devolución, es una solicitud**. El dinero solo sale cuando una de las cuatro
+devolución, es una solicitud**. El dinero solo sale cuando una de las
 personas autorizadas pone su nombre en la columna **Autorización** del Sheet.
 
 Esa columna está bloqueada: quien no esté en la lista no puede escribir en
 ella, aunque pueda editar el resto de la hoja. Al intentarlo, Google le
 muestra un aviso y no le deja.
 
-**Antes de que funcione hay que rellenar la lista.** En `Código.gs`, arriba
-del todo, está esto:
+La lista vive en `Código.gs`, arriba del todo, y ya está rellenada:
 
 ```
 const AUTORIZADORES = [
-  { nombre: 'PENDIENTE 1', correo: '' },
-  { nombre: 'PENDIENTE 2', correo: '' },
-  { nombre: 'PENDIENTE 3', correo: '' },
-  { nombre: 'PENDIENTE 4', correo: '' },
+  { nombre: 'Jaime', correos: ['jaime@motickfamily.com'] },
+  { nombre: 'Gon', correos: ['gonzalo@motickfamily.com', 'gonzalo.garnelo@gmail.com'] },
+  { nombre: 'Nacho', correos: ['nacho.carrion@motickfamily.com'] },
 ];
 ```
 
-Hay que poner el nombre de cada persona (es lo que verán en el desplegable)
-y el correo de su cuenta de Google. Después, guardar y ejecutar
-**Devoluciones → Preparar columnas de seguimiento** para que se aplique.
+El nombre es lo que verán en el desplegable de la celda. Los correos son las
+cuentas desde las que esa persona puede autorizar: quien use más de una
+cuenta las pone todas, como Gon.
 
-Mientras los correos estén vacíos, la columna **no** se bloquea: es
+Para añadir o quitar a alguien, se edita esta lista y se vuelve a ejecutar
+**Devoluciones → Preparar columnas de seguimiento**.
+
+**Cada una de esas cuentas necesita permiso de edición sobre el Sheet.**
+Estar en la lista no se lo da: si una cuenta no tiene acceso al archivo, no
+podrá ni abrirlo, y mucho menos autorizar.
+
+Si los correos se dejaran vacíos, la columna **no** se bloquearía: es
 preferible dejarla abierta a bloqueársela a todo el mundo por error. El
-propio menú te avisa de cuál de los dos casos ha ocurrido.
+propio menú avisa de cuál de los dos casos ha ocurrido.
 
 > Al dueño del Sheet no se le puede dejar fuera. Google siempre permite al
 > propietario del archivo editar cualquier celda, esté protegida o no.
@@ -308,7 +313,7 @@ en `Pendiente`:
 1. Comprueba el pago cruzándolo con los registros de la empresa.
 2. Hace la transferencia.
 3. En la columna **Estado devolución** elige `Devolución efectuada`.
-4. Una de las cuatro personas autorizadas pone su nombre en **Autorización**.
+4. Una de las personas autorizadas pone su nombre en **Autorización**.
 5. Rellena **Fecha transferencia**, **Importe** y **Justificante enviado al
    comercial**.
 
