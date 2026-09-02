@@ -86,7 +86,7 @@ línea lleva su número a la izquierda:
 - Sube del todo con `Ctrl + Inicio`. La **línea 1** tiene que empezar por
   `/**`.
 - Baja del todo con `Ctrl + Fin`. La última línea tiene que ser `}` y el
-  número de línea rondar el **444**.
+  número de línea rondar el **652**.
 
 Si el número final es mucho menor, el pegado se quedó a medias: borra todo
 y repite.
@@ -116,7 +116,7 @@ Este es el archivo que ve el cliente. Hay que crearlo aparte.
 **Comprueba también aquí que se pegó entero**, igual que antes:
 
 - Línea 1: `<!DOCTYPE html>`
-- Última línea: `</html>`, con el número de línea rondando el **534**.
+- Última línea: `</html>`, con el número de línea rondando el **599**.
 
 Si empieza por otra cosa, faltan trozos. Borra todo (`Ctrl + A`, `Supr`) y
 vuelve a pegar.
@@ -262,6 +262,32 @@ enlace en el chat, elija **Copiar**, abra su navegador y lo pegue ahí.
 
 ---
 
+## Cómo se autoriza una devolución
+
+El formulario es público: cualquiera con el enlace podría rellenarlo. Por eso
+**sin código de autorización no se puede enviar**, y el código solo lo pueden
+crear las personas con acceso de edición al Sheet.
+
+Cuando una devolución se aprueba:
+
+1. Abre el Sheet y entra en **Devoluciones → Crear código de autorización**.
+2. Escribe la **matrícula** de la moto y pulsa Aceptar.
+3. Escribe el **nombre del cliente** y pulsa Aceptar.
+4. Sale una ventana con el código, tipo `AUT-K7M2QP`. Cópialo.
+5. Manda al cliente **el enlace del formulario y ese código**.
+
+El código sirve **una sola vez**, solo para **esa matrícula**, y **caduca a
+los 30 días**. El cliente no escribe la matrícula: se rellena sola a partir
+del código, así que no puede pedir la devolución de otra moto.
+
+Queda todo registrado en la pestaña **Autorizaciones** del Sheet: quién creó
+cada código, cuándo, para qué cliente y qué solicitud lo gastó.
+
+> Si un cliente escribe pidiendo la devolución y no le corresponde,
+> simplemente no se le da código. No hay nada que rechazar después.
+
+---
+
 ## Cómo se usa el día a día
 
 **El cliente** recibe el enlace y rellena el formulario. No hay que hacer
@@ -275,6 +301,9 @@ en `Pendiente`:
 3. En la columna **Estado devolución** elige `Devolución efectuada`.
 4. Rellena **Fecha transferencia**, **Importe** y **Justificante enviado al
    comercial**.
+
+Si una solicitud no procede, se marca como **`Devolución denegada`** y esa
+fila queda cerrada, sin pedir ningún dato más.
 
 Si marca "Devolución efectuada" y se deja alguna de las tres casillas
 vacías, **se pintan de rojo** y sale un aviso. El rojo desaparece solo al

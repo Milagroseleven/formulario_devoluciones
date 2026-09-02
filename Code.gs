@@ -32,9 +32,17 @@ const CARPETA_NOMBRE = 'Devoluciones de reservas';
 const HOJA_ID = '1bi7olbGvhe0rogClo0jC5PAmNgkLTPHWMXm9fOSHq2A';
 
 const SHEET_NAME = 'Solicitudes';
+const SHEET_AUTORIZACIONES = 'Autorizaciones';
 
 const EMPRESA = 'Sanchoyjote S.L.';
 const NIF = 'B72770191';
+
+// Días que vale un código desde que se crea.
+const DIAS_VALIDEZ_CODIGO = 30;
+
+// Alfabeto sin caracteres que se confunden al dictarlos por teléfono
+// (nada de O/0 ni I/1).
+const ALFABETO_CODIGO = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
 // Modalidad por la que el cliente pagó la reserva que ahora reclama.
 const MODALIDADES = [
@@ -77,7 +85,8 @@ const AVISO_MATRICULA = 'La matrícula no parece válida. Formatos admitidos: ' 
 // ---------------------------------------------------------------------
 const ESTADO_PENDIENTE = 'Pendiente';
 const ESTADO_EFECTUADA = 'Devolución efectuada';
-const ESTADOS = [ESTADO_PENDIENTE, ESTADO_EFECTUADA];
+const ESTADO_DENEGADA = 'Devolución denegada';
+const ESTADOS = [ESTADO_PENDIENTE, ESTADO_EFECTUADA, ESTADO_DENEGADA];
 
 const JUSTIFICANTE_OPCIONES = ['Ok', 'Pendiente'];
 
@@ -95,7 +104,7 @@ const HEADERS = [
   'Fecha de la reserva',
   'Modalidad de reserva',
   'Modelo de la moto',
-  'Matrícula o código',
+  'Matrícula',
   'Comercial',
   'Motivo de la devolución',
   'Detalle del motivo',
@@ -105,7 +114,29 @@ const HEADERS = [
   COL_FECHA_NOMBRE,
   COL_IMPORTE_NOMBRE,
   COL_JUSTIFICANTE_NOMBRE,
+  // Estas dos van al final a propósito: así las columnas que ya tienen
+  // datos en la hoja no se mueven de sitio.
+  'Código de autorización',
+  'Autorizado por',
 ];
+
+// Cabeceras de la pestaña de autorizaciones.
+const HEADERS_AUTORIZACIONES = [
+  'Código',
+  'Matrícula',
+  'Cliente',
+  'Autorizado por',
+  'Fecha de creación',
+  'Caduca',
+  'Usado por solicitud',
+  'Fecha de uso',
+];
+
+const AUT_COL_CODIGO = 1;
+const AUT_COL_MATRICULA = 2;
+const AUT_COL_CADUCA = 6;
+const AUT_COL_USADO = 7;
+const AUT_COL_FECHA_USO = 8;
 
 // Posiciones (1 = columna A) de las columnas de seguimiento.
 const COL_ESTADO = HEADERS.indexOf(COL_ESTADO_NOMBRE) + 1;
@@ -161,6 +192,18 @@ function getLibro_() {
   return SpreadsheetApp.getActiveSpreadsheet();
 }
 
+/**
+ * Escribe (o reescribe) la fila de cabeceras. Se puede llamar sobre una
+ * hoja que ya tiene datos: la fila 1 es solo texto, así que actualizarla
+ * no toca ninguna solicitud.
+ */
+function escribirCabeceras_(sheet, cabeceras) {
+  sheet.getRange(1, 1, 1, cabeceras.length)
+    .setValues([cabeceras])
+    .setFontWeight('bold');
+  sheet.setFrozenRows(1);
+}
+
 /** Devuelve la pestaña de solicitudes, creándola con cabeceras. */
 function getHojaSolicitudes_() {
   const libro = getLibro_();
@@ -169,11 +212,24 @@ function getHojaSolicitudes_() {
     sheet = libro.insertSheet(SHEET_NAME);
   }
   if (sheet.getLastRow() === 0) {
-    sheet.appendRow(HEADERS);
-    sheet.setFrozenRows(1);
-    sheet.getRange(1, 1, 1, HEADERS.length).setFontWeight('bold');
+    escribirCabeceras_(sheet, HEADERS);
     sheet.autoResizeColumns(1, HEADERS.length);
     prepararSeguimiento_(sheet);
+  }
+  return sheet;
+}
+
+/** Devuelve la pestaña de autorizaciones, creándola si no existe. */
+function getHojaAutorizaciones_() {
+  const libro = getLibro_();
+  let sheet = libro.getSheetByName(SHEET_AUTORIZACIONES);
+  if (!sheet) {
+    sheet = libro.insertSheet(SHEET_AUTORIZACIONES);
+  }
+  if (sheet.getLastRow() === 0) {
+    escribirCabeceras_(sheet, HEADERS_AUTORIZACIONES);
+    sheet.getRange(2, AUT_COL_CADUCA, 5000, 1).setNumberFormat('dd/mm/yyyy');
+    sheet.autoResizeColumns(1, HEADERS_AUTORIZACIONES.length);
   }
   return sheet;
 }
@@ -208,6 +264,8 @@ function prepararSeguimiento_(sheet) {
 function onOpen() {
   SpreadsheetApp.getUi()
     .createMenu('Devoluciones')
+    .addItem('Crear código de autorización', 'crearCodigoAutorizacion')
+    .addSeparator()
     .addItem('Preparar columnas de seguimiento', 'configurarHoja')
     .addItem('Revisar devoluciones incompletas', 'revisarTodo')
     .addToUi();
@@ -216,9 +274,126 @@ function onOpen() {
 /** Se ejecuta a mano desde el menú, o una sola vez tras instalar. */
 function configurarHoja() {
   const sheet = getHojaSolicitudes_();
+  escribirCabeceras_(sheet, HEADERS);
   prepararSeguimiento_(sheet);
+  getHojaAutorizaciones_();
   revisarTodo();
   sheet.getParent().toast('Columnas de seguimiento preparadas.', 'Devoluciones', 5);
+}
+
+// ---------------------------------------------------------------------
+// CÓDIGOS DE AUTORIZACIÓN
+//
+// El formulario es público, así que sin código no se puede solicitar una
+// devolución. El código lo crea desde este menú una de las personas
+// autorizadas, va ligado a una matrícula concreta, caduca y solo sirve
+// una vez. Así queda registrado quién autorizó cada devolución.
+// ---------------------------------------------------------------------
+
+function nuevoCodigo_() {
+  let sufijo = '';
+  for (let i = 0; i < 6; i++) {
+    sufijo += ALFABETO_CODIGO.charAt(Math.floor(Math.random() * ALFABETO_CODIGO.length));
+  }
+  return 'AUT-' + sufijo;
+}
+
+/** Se ejecuta desde el menú de la hoja. Pide matrícula y cliente. */
+function crearCodigoAutorizacion() {
+  const ui = SpreadsheetApp.getUi();
+
+  const pMatricula = ui.prompt(
+    'Nuevo código de autorización',
+    'Matrícula de la moto (por ejemplo 3720 KDV):',
+    ui.ButtonSet.OK_CANCEL);
+  if (pMatricula.getSelectedButton() !== ui.Button.OK) return;
+
+  const matricula = normalizarMatricula_(pMatricula.getResponseText());
+  if (!matriculaValida_(matricula)) {
+    ui.alert(AVISO_MATRICULA);
+    return;
+  }
+
+  const pCliente = ui.prompt(
+    'Nuevo código de autorización',
+    'Nombre del cliente al que se le entrega el código:',
+    ui.ButtonSet.OK_CANCEL);
+  if (pCliente.getSelectedButton() !== ui.Button.OK) return;
+
+  const cliente = pCliente.getResponseText().trim();
+  if (!cliente) {
+    ui.alert('Hay que indicar el nombre del cliente.');
+    return;
+  }
+
+  const ahora = new Date();
+  const caduca = new Date(ahora.getTime() + DIAS_VALIDEZ_CODIGO * 24 * 60 * 60 * 1000);
+  const codigo = nuevoCodigo_();
+  const autorizadoPor = Session.getActiveUser().getEmail() || '(sin identificar)';
+
+  getHojaAutorizaciones_().appendRow([
+    codigo, matricula, cliente, autorizadoPor, ahora, caduca, '', '',
+  ]);
+
+  const caducaTexto = Utilities.formatDate(caduca, Session.getScriptTimeZone(), 'dd/MM/yyyy');
+  ui.alert(
+    'Código creado',
+    'Código: ' + codigo + '\n\n' +
+    'Matrícula: ' + matricula + '\n' +
+    'Cliente: ' + cliente + '\n' +
+    'Válido hasta: ' + caducaTexto + '\n\n' +
+    'Pásaselo al cliente junto con el enlace del formulario. Solo sirve ' +
+    'una vez y solo para esta matrícula.',
+    ui.ButtonSet.OK);
+}
+
+/**
+ * Busca un código y dice si sirve. Devuelve la fila (1 = cabecera) para
+ * poder marcarla como usada después.
+ * Estados posibles: 'ok', 'noExiste', 'usado', 'caducado'.
+ */
+function buscarCodigo_(codigo) {
+  const limpio = String(codigo || '').trim().toUpperCase();
+  if (!limpio) return { estado: 'noExiste' };
+
+  const sheet = getHojaAutorizaciones_();
+  const ultima = sheet.getLastRow();
+  if (ultima < 2) return { estado: 'noExiste' };
+
+  const datos = sheet.getRange(2, 1, ultima - 1, HEADERS_AUTORIZACIONES.length).getValues();
+  for (let i = 0; i < datos.length; i++) {
+    if (String(datos[i][AUT_COL_CODIGO - 1]).trim().toUpperCase() !== limpio) continue;
+
+    const fila = i + 2;
+    const matricula = String(datos[i][AUT_COL_MATRICULA - 1]).trim().toUpperCase();
+    if (datos[i][AUT_COL_USADO - 1]) return { estado: 'usado', fila: fila, matricula: matricula };
+
+    const caduca = datos[i][AUT_COL_CADUCA - 1];
+    if (caduca instanceof Date && caduca.getTime() < Date.now()) {
+      return { estado: 'caducado', fila: fila, matricula: matricula };
+    }
+    return { estado: 'ok', fila: fila, matricula: matricula, autorizadoPor: String(datos[i][3] || '') };
+  }
+  return { estado: 'noExiste' };
+}
+
+const AVISO_CODIGO = {
+  noExiste: 'Ese código de autorización no existe. Revísalo con la persona de ' +
+    EMPRESA + ' que te lo facilitó.',
+  usado: 'Ese código ya se ha utilizado en una solicitud anterior.',
+  caducado: 'Ese código ha caducado. Pide uno nuevo.',
+};
+
+/**
+ * La llama el formulario en cuanto el cliente escribe el código, para
+ * avisarle antes de que rellene todo lo demás.
+ */
+function verificarCodigo(codigo) {
+  const r = buscarCodigo_(codigo);
+  if (r.estado === 'ok') {
+    return { ok: true, matricula: r.matricula };
+  }
+  return { ok: false, mensaje: AVISO_CODIGO[r.estado] };
 }
 
 /**
@@ -355,12 +530,15 @@ function extensionDe_(mimeType, nombreOriginal) {
 }
 
 /**
- * data: {nombre, telefono, correo, fechaReserva, modalidad, modelo,
+ * data: {codigo, nombre, telefono, correo, fechaReserva, modalidad, modelo,
  *        matricula, comercial, motivo, detalleMotivo, iban,
  *        fileBase64, fileMimeType, fileName}
  *
  * Se vuelve a validar todo aquí aunque el formulario ya lo haya hecho: la
  * página es pública y lo que llega del navegador no es de fiar.
+ *
+ * El código de autorización se comprueba y se marca como usado dentro de
+ * un candado, para que dos envíos a la vez no puedan gastar el mismo.
  */
 function submitDevolucion(data) {
   data = data || {};
@@ -373,7 +551,9 @@ function submitDevolucion(data) {
   const comercial = String(data.comercial || '').trim();
   const detalleMotivo = String(data.detalleMotivo || '').trim();
   const iban = normalizarIban_(data.iban);
+  const codigo = String(data.codigo || '').trim().toUpperCase();
 
+  if (!codigo) throw new Error('Falta el código de autorización.');
   if (!nombre) throw new Error('Falta el nombre y los apellidos.');
   if (!telefono) throw new Error('Falta el teléfono de contacto.');
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(correo)) {
@@ -406,38 +586,66 @@ function submitDevolucion(data) {
   const ahora = new Date();
   const id = nuevoId_(ahora);
 
-  const nombreArchivo = sanitize_([
-    matricula,
-    'Certificado titularidad',
-    nombre,
-    id,
-  ].join(' - ')) + extensionDe_(data.fileMimeType, data.fileName);
+  // A partir de aquí se toca el código de autorización, así que solo puede
+  // haber un envío a la vez.
+  const candado = LockService.getScriptLock();
+  try {
+    candado.waitLock(20000);
+  } catch (err) {
+    throw new Error('Hay otra solicitud en curso. Espera unos segundos y vuelve a enviar.');
+  }
 
-  const decoded = Utilities.base64Decode(data.fileBase64);
-  const blob = Utilities.newBlob(decoded, data.fileMimeType, nombreArchivo);
-  const fileUrl = getCarpeta_().createFile(blob).getUrl();
+  try {
+    const autorizacion = buscarCodigo_(codigo);
+    if (autorizacion.estado !== 'ok') {
+      throw new Error(AVISO_CODIGO[autorizacion.estado]);
+    }
+    if (autorizacion.matricula !== matricula) {
+      throw new Error('Ese código de autorización es para la matrícula ' +
+        autorizacion.matricula + ', no para la que has indicado.');
+    }
 
-  const sheet = getHojaSolicitudes_();
-  sheet.appendRow([
-    ahora,
-    id,
-    nombre,
-    telefono,
-    correo,
-    data.fechaReserva,
-    data.modalidad,
-    modelo,
-    matricula,
-    comercial,
-    data.motivo,
-    detalleMotivo,
-    iban,
-    fileUrl,
-    ESTADO_PENDIENTE,
-    '',
-    '',
-    '',
-  ]);
+    const nombreArchivo = sanitize_([
+      matricula,
+      'Certificado titularidad',
+      nombre,
+      id,
+    ].join(' - ')) + extensionDe_(data.fileMimeType, data.fileName);
+
+    const decoded = Utilities.base64Decode(data.fileBase64);
+    const blob = Utilities.newBlob(decoded, data.fileMimeType, nombreArchivo);
+    const fileUrl = getCarpeta_().createFile(blob).getUrl();
+
+    getHojaSolicitudes_().appendRow([
+      ahora,
+      id,
+      nombre,
+      telefono,
+      correo,
+      data.fechaReserva,
+      data.modalidad,
+      modelo,
+      matricula,
+      comercial,
+      data.motivo,
+      detalleMotivo,
+      iban,
+      fileUrl,
+      ESTADO_PENDIENTE,
+      '',
+      '',
+      '',
+      codigo,
+      autorizacion.autorizadoPor,
+    ]);
+
+    // El código queda gastado solo si todo lo anterior ha salido bien.
+    const hojaAut = getHojaAutorizaciones_();
+    hojaAut.getRange(autorizacion.fila, AUT_COL_USADO).setValue(id);
+    hojaAut.getRange(autorizacion.fila, AUT_COL_FECHA_USO).setValue(ahora);
+  } finally {
+    candado.releaseLock();
+  }
 
   return { id: id };
 }
