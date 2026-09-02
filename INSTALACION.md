@@ -86,7 +86,7 @@ línea lleva su número a la izquierda:
 - Sube del todo con `Ctrl + Inicio`. La **línea 1** tiene que empezar por
   `/**`.
 - Baja del todo con `Ctrl + Fin`. La última línea tiene que ser `}` y el
-  número de línea rondar el **449**.
+  número de línea rondar el **444**.
 
 Si el número final es mucho menor, el pegado se quedó a medias: borra todo
 y repite.
@@ -116,7 +116,7 @@ Este es el archivo que ve el cliente. Hay que crearlo aparte.
 **Comprueba también aquí que se pegó entero**, igual que antes:
 
 - Línea 1: `<!DOCTYPE html>`
-- Última línea: `</html>`, con el número de línea rondando el **537**.
+- Última línea: `</html>`, con el número de línea rondando el **534**.
 
 Si empieza por otra cosa, faltan trozos. Borra todo (`Ctrl + A`, `Supr`) y
 vuelve a pegar.

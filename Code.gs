@@ -58,16 +58,15 @@ const MOTIVOS = [
 const MIME_ADMITIDOS = ['application/pdf', 'image/jpeg', 'image/png', 'image/heic', 'image/webp'];
 const TAMANO_MAXIMO_MB = 10;
 
-// Formato de matrícula española (igual que en el formulario de caja):
-// "1234 BCD" (actual) o "A 1234", "AB 123456", "A 1234 BC" (formatos con
-// letra de provincia). Si en vez de matrícula viene el código interno de
-// una unidad, se admite como alternativa cualquier texto alfanumérico de
-// 3 a 15 caracteres que lleve al menos un dígito, para no bloquear un
-// código legítimo pero sí rechazar algo escrito al azar como "asdasd".
-const RE_MATRICULA = /^(\d{4} [A-Z]{3}|[A-Z]{1,2} \d{4,6}( [A-Z]{1,3})?)$/;
-const RE_CODIGO = /^[A-Z0-9][A-Z0-9-]{2,14}$/;
-const AVISO_MATRICULA = 'La matrícula o el código no parece válido. Escribe la ' +
-  'matrícula (por ejemplo 1234 BCD) o el código de la unidad.';
+// Formatos de matrícula admitidos (igual que en el formulario de caja):
+// "3720 KDV" (formato actual), "A 108859" / "M 8214 YV" / "C 2107 BWM"
+// (formatos con letra de provincia, con o sin letras al final), cada uno
+// con un número de unidad opcional al final ("3720 KDV 2") para cuando
+// varias motos comparten matrícula.
+const RE_MATRICULA = /^(\d{4} [A-Z]{3}|[A-Z]{1,2} \d{4,6}( [A-Z]{1,3})?)( \d{1,2})?$/;
+const AVISO_MATRICULA = 'La matrícula no parece válida. Formatos admitidos: ' +
+  '3720 KDV, A 108859, M 8214 YV, C 2107 BWM (con el número de unidad al ' +
+  'final si hace falta, por ejemplo "3720 KDV 2").';
 
 // ---------------------------------------------------------------------
 // SEGUIMIENTO INTERNO (las cuatro últimas columnas)
@@ -130,7 +129,6 @@ function doGet() {
     motivoOtros: MOTIVO_OTROS,
     tamanoMaximoMb: TAMANO_MAXIMO_MB,
     reMatricula: RE_MATRICULA.source,
-    reCodigo: RE_CODIGO.source,
     avisoMatricula: AVISO_MATRICULA,
   });
   return t.evaluate()
@@ -310,11 +308,8 @@ function normalizarMatricula_(valor) {
   return m.slice(1).filter(Boolean).join(' ');
 }
 
-/** Matrícula española válida, o código interno alfanumérico con algún dígito. */
 function matriculaValida_(matricula) {
-  if (RE_MATRICULA.test(matricula)) return true;
-  const sinEspacios = matricula.replace(/ /g, '');
-  return RE_CODIGO.test(sinEspacios) && /\d/.test(sinEspacios);
+  return RE_MATRICULA.test(matricula);
 }
 
 /** Quita espacios y pasa a mayúsculas: así se guarda y se compara el IBAN. */
@@ -389,7 +384,7 @@ function submitDevolucion(data) {
     throw new Error('Falta indicar la modalidad de la reserva.');
   }
   if (!modelo) throw new Error('Falta el modelo de la moto.');
-  if (!matricula) throw new Error('Falta la matrícula o el código.');
+  if (!matricula) throw new Error('Falta la matrícula.');
   if (!matriculaValida_(matricula)) throw new Error(AVISO_MATRICULA);
   if (!comercial) throw new Error('Falta el nombre del comercial.');
   if (MOTIVOS.indexOf(data.motivo) === -1) {

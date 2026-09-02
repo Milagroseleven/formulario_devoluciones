@@ -28,7 +28,7 @@ derivados y con los textos redactados para una persona externa a la empresa.
 | 4 | Fecha de la reserva | Sí | No admite fechas futuras |
 | 5 | Modalidad de reserva | Sí | TPV datáfono · Cash · Reserva por la web · Transferencia a cuenta · Bizum a número de móvil |
 | 6 | Modelo de la moto | Sí | |
-| 7 | Matrícula o código | Sí | Se guarda en mayúsculas |
+| 7 | Matrícula | Sí | Valida el formato: 3720 KDV, A 108859, M 8214 YV, C 2107 BWM, con el número de unidad opcional al final |
 | 8 | Nombre del comercial | Sí | Quien atendió al cliente |
 | 9 | Motivo de la devolución | Sí | Cancelación de financiación · Desistimiento · Motivos personales · Otros |
 | 10 | Explica el motivo | Solo si el motivo es "Otros" | Aparece únicamente al elegir "Otros" |

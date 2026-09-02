@@ -227,8 +227,8 @@
       <label class="req">Modelo de la moto</label>
       <input type="text" id="modelo" placeholder="Marca y modelo">
 
-      <label class="req">Matrícula o código<span class="formato">(1111 AAA o el código de la unidad)</span></label>
-      <input type="text" id="matricula" placeholder="1111 AAA" style="text-transform:uppercase;">
+      <label class="req">Matrícula<span class="formato">(3720 KDV, A 108859, M 8214 YV...)</span></label>
+      <input type="text" id="matricula" placeholder="3720 KDV" style="text-transform:uppercase;">
 
       <label class="req">Nombre del comercial que te atendió</label>
       <input type="text" id="comercial" placeholder="Nombre del comercial">
@@ -334,7 +334,6 @@
     // --- Matrícula --------------------------------------------------------
     // Mismo cálculo que en el servidor, para avisar antes de enviar.
     var PATRON_MATRICULA = new RegExp(CONFIG.reMatricula);
-    var PATRON_CODIGO = new RegExp(CONFIG.reCodigo);
 
     function normalizarMatricula(valor) {
       var t = String(valor || '').toUpperCase().replace(/[^A-Z0-9]+/g, ' ').trim().replace(/\s+/g, ' ');
@@ -346,9 +345,7 @@
     }
 
     function matriculaValida(matricula) {
-      if (PATRON_MATRICULA.test(matricula)) return true;
-      var sinEspacios = matricula.replace(/ /g, '');
-      return PATRON_CODIGO.test(sinEspacios) && /\d/.test(sinEspacios);
+      return PATRON_MATRICULA.test(matricula);
     }
 
     el('matricula').addEventListener('blur', function() {
@@ -448,7 +445,7 @@
       if (!fechaReserva) return showError('Falta la fecha de la reserva.');
       if (!modalidad) return showError('Falta indicar la modalidad de la reserva.');
       if (!modelo) return showError('Falta el modelo de la moto.');
-      if (!matricula) return showError('Falta la matrícula o el código.');
+      if (!matricula) return showError('Falta la matrícula.');
       if (!matriculaValida(matricula)) return showError(CONFIG.avisoMatricula);
       if (!comercial) return showError('Falta el nombre del comercial que te atendió.');
       if (!motivo) return showError('Falta indicar el motivo de la devolución.');
