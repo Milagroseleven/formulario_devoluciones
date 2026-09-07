@@ -36,30 +36,6 @@ const SHEET_NAME = 'Solicitudes';
 const EMPRESA = 'Sanchoyjote S.L.';
 const NIF = 'B72770191';
 
-// ---------------------------------------------------------------------
-// QUIÉN PUEDE AUTORIZAR UNA DEVOLUCIÓN
-//
-// Solo estas personas pueden escribir en la columna "Autorización" de la
-// hoja: el script protege esa columna y deja fuera a todos los demás, aun
-// teniendo permiso de edición sobre el resto del Sheet.
-//
-// El nombre es lo que aparece en el desplegable de la celda. Los correos
-// son las cuentas de Google desde las que esa persona puede autorizar:
-// quien use más de una cuenta las pone todas.
-//
-// Ojo: estar en esta lista no da acceso al Sheet. Cada una de estas
-// cuentas tiene que tener además permiso de edición sobre el archivo, o no
-// podrá ni abrirlo.
-//
-// Al cambiar esta lista hay que volver a ejecutar
-// "Devoluciones -> Preparar columnas de seguimiento" para que se aplique.
-// ---------------------------------------------------------------------
-const AUTORIZADORES = [
-  { nombre: 'Jaime', correos: ['jaime@motickfamily.com'] },
-  { nombre: 'Gon', correos: ['gonzalo@motickfamily.com', 'gonzalo.garnelo@gmail.com'] },
-  { nombre: 'Nacho', correos: ['nacho.carrion@motickfamily.com'] },
-];
-
 // Modalidad por la que el cliente pagó la reserva que ahora reclama.
 const MODALIDADES = [
   'TPV datáfono',
@@ -101,8 +77,7 @@ const AVISO_MATRICULA = 'La matrícula no parece válida. Formatos admitidos: ' 
 // ---------------------------------------------------------------------
 const ESTADO_PENDIENTE = 'Pendiente';
 const ESTADO_EFECTUADA = 'Devolución efectuada';
-const ESTADO_DENEGADA = 'Devolución denegada';
-const ESTADOS = [ESTADO_PENDIENTE, ESTADO_EFECTUADA, ESTADO_DENEGADA];
+const ESTADOS = [ESTADO_PENDIENTE, ESTADO_EFECTUADA];
 
 const JUSTIFICANTE_OPCIONES = ['Ok', 'Pendiente'];
 
@@ -110,9 +85,6 @@ const COL_ESTADO_NOMBRE = 'Estado devolución';
 const COL_FECHA_NOMBRE = 'Fecha transferencia';
 const COL_IMPORTE_NOMBRE = 'Importe';
 const COL_JUSTIFICANTE_NOMBRE = 'Justificante enviado al comercial';
-const COL_AUTORIZACION_NOMBRE = 'Autorización';
-
-const DESCRIPCION_PROTECCION = 'Solo pueden autorizar devoluciones las personas de AUTORIZADORES';
 
 const HEADERS = [
   'Fecha registro',
@@ -123,7 +95,7 @@ const HEADERS = [
   'Fecha de la reserva',
   'Modalidad de reserva',
   'Modelo de la moto',
-  'Matrícula',
+  'Matrícula o código',
   'Comercial',
   'Motivo de la devolución',
   'Detalle del motivo',
@@ -133,9 +105,6 @@ const HEADERS = [
   COL_FECHA_NOMBRE,
   COL_IMPORTE_NOMBRE,
   COL_JUSTIFICANTE_NOMBRE,
-  // Va al final a propósito: así las columnas que ya tienen datos en la
-  // hoja no se mueven de sitio.
-  COL_AUTORIZACION_NOMBRE,
 ];
 
 // Posiciones (1 = columna A) de las columnas de seguimiento.
@@ -143,7 +112,6 @@ const COL_ESTADO = HEADERS.indexOf(COL_ESTADO_NOMBRE) + 1;
 const COL_FECHA = HEADERS.indexOf(COL_FECHA_NOMBRE) + 1;
 const COL_IMPORTE = HEADERS.indexOf(COL_IMPORTE_NOMBRE) + 1;
 const COL_JUSTIFICANTE = HEADERS.indexOf(COL_JUSTIFICANTE_NOMBRE) + 1;
-const COL_AUTORIZACION = HEADERS.indexOf(COL_AUTORIZACION_NOMBRE) + 1;
 
 const FONDO_FALTA = '#fde8e8';
 const NOTA_FALTA = 'Obligatorio al marcar "' + ESTADO_EFECTUADA + '".';
@@ -193,18 +161,6 @@ function getLibro_() {
   return SpreadsheetApp.getActiveSpreadsheet();
 }
 
-/**
- * Escribe (o reescribe) la fila de cabeceras. Se puede llamar sobre una
- * hoja que ya tiene datos: la fila 1 es solo texto, así que actualizarla
- * no toca ninguna solicitud.
- */
-function escribirCabeceras_(sheet, cabeceras) {
-  sheet.getRange(1, 1, 1, cabeceras.length)
-    .setValues([cabeceras])
-    .setFontWeight('bold');
-  sheet.setFrozenRows(1);
-}
-
 /** Devuelve la pestaña de solicitudes, creándola con cabeceras. */
 function getHojaSolicitudes_() {
   const libro = getLibro_();
@@ -213,65 +169,13 @@ function getHojaSolicitudes_() {
     sheet = libro.insertSheet(SHEET_NAME);
   }
   if (sheet.getLastRow() === 0) {
-    escribirCabeceras_(sheet, HEADERS);
+    sheet.appendRow(HEADERS);
+    sheet.setFrozenRows(1);
+    sheet.getRange(1, 1, 1, HEADERS.length).setFontWeight('bold');
     sheet.autoResizeColumns(1, HEADERS.length);
     prepararSeguimiento_(sheet);
   }
   return sheet;
-}
-
-/** Nombres de los autorizadores, para el desplegable de la celda. */
-function nombresAutorizadores_() {
-  return AUTORIZADORES
-    .filter(function(a) { return correosDe_(a).length; })
-    .map(function(a) { return a.nombre; });
-}
-
-/** Los correos de una persona, limpios y sin huecos. */
-function correosDe_(autorizador) {
-  return (autorizador.correos || [])
-    .map(function(c) { return String(c || '').trim(); })
-    .filter(Boolean);
-}
-
-/**
- * Bloquea la columna "Autorización" para todo el mundo menos las personas
- * de AUTORIZADORES. Es Google quien lo impide, no el script: quien no esté
- * en la lista recibe un aviso y no puede escribir en esas celdas.
- *
- * Aviso: al dueño del Sheet no se le puede dejar fuera. Google siempre le
- * deja editar lo que quiera de su propio archivo.
- */
-function protegerAutorizacion_(sheet) {
-  const correos = AUTORIZADORES.reduce(function(acc, a) {
-    return acc.concat(correosDe_(a));
-  }, []);
-
-  // Sin la lista rellenada no se protege nada: es preferible dejar la
-  // columna abierta a bloqueársela a todo el mundo por accidente.
-  if (!correos.length) return false;
-
-  // Se quita la protección anterior, para no acumular una por cada vez
-  // que se ejecuta la preparación.
-  const previas = sheet.getProtections(SpreadsheetApp.ProtectionType.RANGE);
-  for (let i = 0; i < previas.length; i++) {
-    if (previas[i].getDescription() === DESCRIPCION_PROTECCION) previas[i].remove();
-  }
-
-  const proteccion = sheet
-    .getRange(2, COL_AUTORIZACION, FILAS_PREPARADAS - 1, 1)
-    .protect()
-    .setDescription(DESCRIPCION_PROTECCION);
-
-  const yo = Session.getEffectiveUser().getEmail();
-  const sobran = proteccion.getEditors()
-    .map(function(u) { return u.getEmail(); })
-    .filter(function(e) { return e && e !== yo && correos.indexOf(e) === -1; });
-  if (sobran.length) proteccion.removeEditors(sobran);
-
-  proteccion.addEditors(correos);
-  if (proteccion.canDomainEdit()) proteccion.setDomainEdit(false);
-  return true;
 }
 
 /**
@@ -298,17 +202,6 @@ function prepararSeguimiento_(sheet) {
 
   sheet.getRange(2, COL_FECHA, filas, 1).setNumberFormat('dd/mm/yyyy');
   sheet.getRange(2, COL_IMPORTE, filas, 1).setNumberFormat('#,##0.00 €');
-
-  const nombres = nombresAutorizadores_();
-  if (nombres.length) {
-    const validacionAutorizacion = SpreadsheetApp.newDataValidation()
-      .requireValueInList(nombres, true)
-      .setAllowInvalid(false)
-      .setHelpText('Elige tu nombre para autorizar esta devolución.')
-      .build();
-    sheet.getRange(2, COL_AUTORIZACION, filas, 1).setDataValidation(validacionAutorizacion);
-  }
-  return protegerAutorizacion_(sheet);
 }
 
 /** Menú propio de la hoja, para poder relanzar la configuración a mano. */
@@ -323,16 +216,9 @@ function onOpen() {
 /** Se ejecuta a mano desde el menú, o una sola vez tras instalar. */
 function configurarHoja() {
   const sheet = getHojaSolicitudes_();
-  escribirCabeceras_(sheet, HEADERS);
-  const protegida = prepararSeguimiento_(sheet);
+  prepararSeguimiento_(sheet);
   revisarTodo();
-  sheet.getParent().toast(
-    protegida
-      ? 'Columnas preparadas. La columna "' + COL_AUTORIZACION_NOMBRE +
-        '" queda bloqueada para quien no esté en AUTORIZADORES.'
-      : 'Columnas preparadas. Ojo: falta rellenar los correos en AUTORIZADORES, ' +
-        'así que la columna "' + COL_AUTORIZACION_NOMBRE + '" sigue abierta a todos.',
-    'Devoluciones', 8);
+  sheet.getParent().toast('Columnas de seguimiento preparadas.', 'Devoluciones', 5);
 }
 
 /**
@@ -359,7 +245,7 @@ function revisarTodo() {
  */
 function revisarFila_(sheet, fila) {
   const estado = sheet.getRange(fila, COL_ESTADO).getValue();
-  const columnas = [COL_AUTORIZACION, COL_FECHA, COL_IMPORTE, COL_JUSTIFICANTE];
+  const columnas = [COL_FECHA, COL_IMPORTE, COL_JUSTIFICANTE];
   const exigir = estado === ESTADO_EFECTUADA;
   let faltan = 0;
 
@@ -388,14 +274,13 @@ function onEdit(e) {
   const fila = e.range.getRow();
   const columna = e.range.getColumn();
   if (fila < 2) return;
-  const vigiladas = [COL_ESTADO, COL_AUTORIZACION, COL_FECHA, COL_IMPORTE, COL_JUSTIFICANTE];
-  if (vigiladas.indexOf(columna) === -1) return;
+  if ([COL_ESTADO, COL_FECHA, COL_IMPORTE, COL_JUSTIFICANTE].indexOf(columna) === -1) return;
 
   const faltan = revisarFila_(sheet, fila);
   if (faltan) {
     sheet.getParent().toast(
       'Marcaste "' + ESTADO_EFECTUADA + '": faltan por rellenar los campos en rojo ' +
-      '(autorización, fecha de transferencia, importe y justificante).',
+      '(fecha de transferencia, importe y justificante).',
       'Fila ' + fila + ' incompleta', 8);
   }
 }
@@ -476,10 +361,6 @@ function extensionDe_(mimeType, nombreOriginal) {
  *
  * Se vuelve a validar todo aquí aunque el formulario ya lo haya hecho: la
  * página es pública y lo que llega del navegador no es de fiar.
- *
- * Que una solicitud entre en la hoja no significa que se vaya a pagar: la
- * autorización la da después una de las personas de AUTORIZADORES, en la
- * columna protegida.
  */
 function submitDevolucion(data) {
   data = data || {};
@@ -536,9 +417,8 @@ function submitDevolucion(data) {
   const blob = Utilities.newBlob(decoded, data.fileMimeType, nombreArchivo);
   const fileUrl = getCarpeta_().createFile(blob).getUrl();
 
-  // La columna de autorización entra vacía: la rellena después una de las
-  // personas de AUTORIZADORES, que son las únicas que pueden escribir ahí.
-  getHojaSolicitudes_().appendRow([
+  const sheet = getHojaSolicitudes_();
+  sheet.appendRow([
     ahora,
     id,
     nombre,
@@ -554,7 +434,6 @@ function submitDevolucion(data) {
     iban,
     fileUrl,
     ESTADO_PENDIENTE,
-    '',
     '',
     '',
     '',

@@ -51,34 +51,7 @@ público y recoge datos bancarios.
 - **ID de solicitud**: `DEV-<aaaammdd>-<4 caracteres>`. Se le muestra al
   cliente al terminar, con un botón para copiarlo.
 
-## Quién puede autorizar una devolución
-
-Cualquiera con el enlace puede **solicitar** una devolución, pero eso no
-mueve dinero. El dinero solo sale cuando una de las personas
-autorizadas pone su nombre en la columna **`Autorización`**.
-
-Esa columna está **protegida por Google**: quien no esté en la lista no
-puede escribir en ella, aunque tenga permiso de edición sobre el resto del
-Sheet. No es un aviso del script, es el propio Google quien lo impide.
-
-Los autorizados se configuran en la constante `AUTORIZADORES` de `Code.gs`,
-con su nombre y sus cuentas de Google. Hoy son **Jaime, Gon y Nacho**; Gon
-puede autorizar desde cualquiera de sus dos cuentas. Después de cambiar la
-lista hay que ejecutar **Devoluciones → Preparar columnas de seguimiento**
-para que se aplique.
-
-Estar en la lista no da acceso al Sheet: cada una de esas cuentas necesita
-además permiso de edición sobre el archivo, o no podrá ni abrirlo.
-
-Además, no se puede marcar una devolución como efectuada sin haberla
-autorizado antes: si la columna `Autorización` está vacía, se pinta en rojo
-igual que el resto de campos obligatorios.
-
-> **Una limitación que conviene conocer:** al dueño del Sheet no se le puede
-> dejar fuera. Google siempre permite al propietario editar cualquier celda
-> de su propio archivo, esté protegida o no.
-
-## Seguimiento interno (las 5 últimas columnas)
+## Seguimiento interno (las 4 últimas columnas)
 
 Estas columnas no las toca el cliente: las lleva el encargado a mano sobre
 la propia hoja. No hace falta ningún aviso automático; el encargado revisa
@@ -86,13 +59,12 @@ las filas en `Pendiente` y las va cerrando.
 
 | Columna | Cómo funciona |
 | --- | --- |
-| `Autorización` | Desplegable con los nombres de las personas autorizadas. Columna protegida: solo ellas pueden escribir |
-| `Estado devolución` | Desplegable `Pendiente` / `Devolución efectuada` / `Devolución denegada`. Toda solicitud nueva entra como `Pendiente` |
+| `Estado devolución` | Desplegable `Pendiente` / `Devolución efectuada`. Toda solicitud nueva entra como `Pendiente` |
 | `Fecha transferencia` | Fecha a mano, formato `dd/mm/aaaa` |
 | `Importe` | Importe devuelto, formato euros |
 | `Justificante enviado al comercial` | Desplegable `Ok` / `Pendiente` |
 
-Al pasar una fila a **`Devolución efectuada`**, las otras cuatro columnas se
+Al pasar una fila a **`Devolución efectuada`**, las otras tres columnas se
 vuelven obligatorias: las que estén vacías se pintan de rojo, les aparece
 una nota al pasar el ratón y salta un aviso en la esquina de la pantalla.
 El rojo desaparece solo en cuanto se rellenan. Google Sheets no permite
@@ -101,9 +73,8 @@ seguir trabajando.
 
 En el menú **Devoluciones** de la hoja hay dos opciones:
 
-- *Preparar columnas de seguimiento*: reescribe las cabeceras y vuelve a
-  aplicar desplegables y formatos (hay que ejecutarla una vez tras instalar
-  el script, y también después de cada cambio que añada columnas).
+- *Preparar columnas de seguimiento*: vuelve a aplicar desplegables y
+  formatos (hay que ejecutarla una vez tras instalar el script).
 - *Revisar devoluciones incompletas*: repasa toda la hoja y marca en rojo
   lo que falte, útil para las filas anteriores a la instalación.
 
@@ -143,7 +114,6 @@ Todo lo configurable está al principio de `Code.gs`:
 | `MODALIDADES` | Opciones del campo 5 |
 | `MOTIVOS` | Opciones del campo 9 |
 | `TAMANO_MAXIMO_MB` | Peso máximo del certificado |
-| `AUTORIZADORES` | Quién puede autorizar, con sus cuentas de Google (una persona puede tener varias) |
 
 Añadir una modalidad o un motivo es tocar una sola lista: el formulario las
 recibe por plantilla y se dibuja solo.
@@ -163,6 +133,11 @@ funciona en la hoja que contiene el script.
   un grupo de WhatsApp no es sitio para eso.
 
 ## Pendiente de confirmar
+
+- **Quién puede autorizar una devolución.** Hoy cualquiera con acceso de
+  edición al Sheet puede marcar una como efectuada. Está pendiente de que
+  dirección decida si hace falta restringirlo a unas personas concretas, y
+  de qué manera.
 
 - Texto legal exacto de la casilla de consentimiento (ahora hay una
   redacción provisional) y si hay que enlazar una política de privacidad.
