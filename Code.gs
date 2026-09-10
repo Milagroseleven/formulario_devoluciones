@@ -126,8 +126,9 @@ const HEADERS = [
 // hoja. Las listas desplegables de esas celdas las pone la hoja, no el
 // código; aquí solo se aplica el bloqueo.
 //
-// El título tiene que coincidir **exactamente** con el de la fila 1. Si no
-// se encuentra, el menú avisa de cuál falta en vez de bloquear otra cosa.
+// El título se compara sin distinguir mayúsculas ni espacios de más, así
+// que un encabezado escrito en dos líneas también encaja. Si aun así no se
+// encuentra, el menú avisa de cuál falta en vez de bloquear otra cosa.
 //
 // Al cambiar estas listas hay que volver a ejecutar
 // "Devoluciones -> Preparar columnas de seguimiento" para que se aplique.
@@ -244,20 +245,59 @@ function getHojaSolicitudes_() {
 // ---------------------------------------------------------------------
 
 /** Título de cada columna -> su número (1 = columna A). */
+/**
+ * Deja el título como texto comparable: los saltos de línea dentro de la
+ * celda y los espacios de más pasan a un único espacio. Es lo que permite
+ * que una cabecera escrita en dos líneas siga encontrándose.
+ */
+function normalizarTitulo_(titulo) {
+  return String(titulo || '').replace(/\s+/g, ' ').trim();
+}
+
+/** Versión aún más suelta, para el segundo intento: sin espacios ni mayúsculas. */
+function tituloSuelto_(titulo) {
+  return normalizarTitulo_(titulo).toLowerCase().replace(/\s+/g, '');
+}
+
 function posiciones_(sheet) {
   const cabeceras = sheet.getRange(1, 1, 1, sheet.getMaxColumns()).getValues()[0];
   const mapa = {};
   for (let i = 0; i < cabeceras.length; i++) {
-    const titulo = String(cabeceras[i] || '').trim();
+    const titulo = normalizarTitulo_(cabeceras[i]);
     // Si hubiera dos columnas con el mismo título, manda la primera.
     if (titulo && !(titulo in mapa)) mapa[titulo] = i + 1;
   }
   return mapa;
 }
 
+/**
+ * Busca una columna por su título y devuelve su número, o 0 si no está.
+ *
+ * Primero compara el título tal cual (ya sin saltos de línea ni espacios
+ * dobles). Si no aparece, lo intenta otra vez ignorando mayúsculas y todos
+ * los espacios, para que "Validación Gon / Jaime / Nacho" y
+ * "Validación Gon/Jaime/Nacho" cuenten como la misma columna.
+ */
+function buscarColumna_(mapa, titulo) {
+  const exacto = mapa[normalizarTitulo_(titulo)];
+  if (exacto) return exacto;
+
+  const buscado = tituloSuelto_(titulo);
+  const claves = Object.keys(mapa);
+  for (let i = 0; i < claves.length; i++) {
+    if (tituloSuelto_(claves[i]) === buscado) return mapa[claves[i]];
+  }
+  return 0;
+}
+
+/** Los títulos que hay ahora mismo en la fila 1, para poder enseñarlos. */
+function titulosDeLaHoja_(sheet) {
+  return Object.keys(posiciones_(sheet));
+}
+
 /** Como posiciones_, pero avisa claro si falta una columna esperada. */
 function columnaDe_(mapa, titulo) {
-  const col = mapa[titulo];
+  const col = buscarColumna_(mapa, titulo);
   if (!col) {
     throw new Error('No se encuentra la columna "' + titulo + '" en la fila 1 de la ' +
       'pestaña "' + SHEET_NAME + '". Si la has renombrado, hay que volver a ponerle ' +
@@ -381,9 +421,9 @@ function letraColumna_(numero) {
  */
 function aplicarSombreado_(sheet) {
   const col = posiciones_(sheet);
-  const numeroMotivo = col['Motivo de la devolución'];
-  const numeroFinanciaciones = col[COL_VALIDACION_FINANCIACIONES];
-  const numeroDireccion = col[COL_VALIDACION_DIRECCION];
+  const numeroMotivo = buscarColumna_(col, 'Motivo de la devolución');
+  const numeroFinanciaciones = buscarColumna_(col, COL_VALIDACION_FINANCIACIONES);
+  const numeroDireccion = buscarColumna_(col, COL_VALIDACION_DIRECCION);
 
   if (!numeroMotivo || !numeroFinanciaciones || !numeroDireccion) return false;
 
@@ -442,7 +482,7 @@ function protegerValidaciones_(sheet) {
   const fallos = [];
 
   COLUMNAS_PROTEGIDAS.forEach(function(conf) {
-    const numero = col[conf.columna];
+    const numero = buscarColumna_(col, conf.columna);
     if (!numero) {
       fallos.push(conf.columna + ' (no existe esa columna en la fila 1)');
       return;
@@ -504,18 +544,30 @@ function configurarHoja() {
   const proteccion = protegerValidaciones_(sheet);
   revisarTodo();
 
-  const partes = ['Columnas de seguimiento preparadas.'];
-  if (proteccion.hechas.length) {
-    partes.push('Bloqueadas: ' + proteccion.hechas.join(', ') + '.');
-  }
-  if (proteccion.fallos.length) {
-    partes.push('SIN bloquear: ' + proteccion.fallos.join(' | ') + '.');
-  }
-  partes.push(sombreado
-    ? 'Sombreado automático aplicado.'
-    : 'Sin sombreado: faltan las columnas de validación o la del motivo.');
+  // Si algo no ha salido, se cuenta en una ventana en vez de en el aviso
+  // pequeño de la esquina, que corta el texto justo cuando más falta hace
+  // leerlo. Se listan los títulos reales de la hoja para poder comparar.
+  if (proteccion.fallos.length || !sombreado) {
+    const detalle = ['No se ha podido aplicar todo:', ''];
+    proteccion.fallos.forEach(function(f) { detalle.push('  · ' + f); });
+    if (!sombreado) {
+      detalle.push('  · Sombreado automático: falta alguna de las columnas de ' +
+        'validación o la de "Motivo de la devolución".');
+    }
+    detalle.push('', 'Títulos que hay ahora en la fila 1:', '');
+    titulosDeLaHoja_(sheet).forEach(function(t) { detalle.push('  ' + t); });
+    detalle.push('', 'Copia el título tal cual de esta lista a COLUMNAS_PROTEGIDAS, ' +
+      'o corrige el de la hoja.');
 
-  sheet.getParent().toast(partes.join(' '), 'Devoluciones', 15);
+    SpreadsheetApp.getUi().alert('Devoluciones', detalle.join('\n'),
+      SpreadsheetApp.getUi().ButtonSet.OK);
+    return;
+  }
+
+  sheet.getParent().toast(
+    'Columnas preparadas. Bloqueadas: ' + proteccion.hechas.join(', ') +
+    '. Sombreado automático aplicado.',
+    'Devoluciones', 10);
 }
 
 /**
@@ -580,10 +632,10 @@ function onEdit(e) {
 
   const col = posiciones_(sheet);
   const vigiladas = [
-    col[COL_ESTADO_NOMBRE],
-    col[COL_FECHA_NOMBRE],
-    col[COL_IMPORTE_NOMBRE],
-    col[COL_JUSTIFICANTE_NOMBRE],
+    buscarColumna_(col, COL_ESTADO_NOMBRE),
+    buscarColumna_(col, COL_FECHA_NOMBRE),
+    buscarColumna_(col, COL_IMPORTE_NOMBRE),
+    buscarColumna_(col, COL_JUSTIFICANTE_NOMBRE),
   ];
   if (vigiladas.indexOf(columna) === -1) return;
 

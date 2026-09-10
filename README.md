@@ -86,6 +86,11 @@ Las listas están en `COLUMNAS_PROTEGIDAS`, al principio de `Code.gs`. Al
 cambiarlas hay que ejecutar **Devoluciones → Preparar columnas de
 seguimiento** para que se apliquen.
 
+Los títulos se comparan sin distinguir mayúsculas ni espacios de más, así
+que un encabezado escrito en dos líneas dentro de la celda también encaja.
+Si aun así no se encuentra alguno, el menú abre una ventana con los títulos
+que hay de verdad en la fila 1 para poder compararlos.
+
 > Hacerlo desde el menú de Sheets (*Datos → Proteger hojas e intervalos*)
 > funciona, pero por defecto deja el intervalo en **"Solo tú"**: hay que
 > entrar en *Establecer permisos → Restringir quién puede editar este
