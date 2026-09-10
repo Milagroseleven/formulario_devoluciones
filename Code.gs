@@ -401,6 +401,92 @@ const COLUMNAS_CON_LISTA = [
 ];
 
 /**
+ * Enseña todo lo que decide quién puede escribir en la hoja: quién tiene
+ * acceso al archivo, qué protecciones hay puestas y a quién deja editar
+ * cada una.
+ *
+ * Existe porque hay dos motivos por los que alguien de la lista sigue sin
+ * poder escribir, y desde la ventana de Google no se ven:
+ *
+ *   1. No tiene acceso de edición al archivo. Estar en la lista de un
+ *      intervalo protegido no se lo da: primero hay que compartirle el
+ *      Sheet como editor.
+ *   2. Hay otra protección encima del mismo intervalo. Las protecciones
+ *      se suman, no se sustituyen: si dos cubren la misma celda, hay que
+ *      estar en las dos listas. Una protección vieja hecha a mano deja
+ *      fuera a todo el mundo aunque la nueva esté bien.
+ */
+function verProtecciones() {
+  const libro = getLibro_();
+  const sheet = getHojaSolicitudes_();
+
+  let editoresArchivo = [];
+  try {
+    editoresArchivo = libro.getEditors()
+      .map(function(u) { return u.getEmail(); })
+      .filter(Boolean);
+  } catch (err) {
+    // Sin permiso para listar los editores del archivo se sigue adelante:
+    // el resto del informe es igual de útil.
+  }
+
+  const lineas = ['QUIÉN PUEDE EDITAR EL ARCHIVO', ''];
+  if (editoresArchivo.length) {
+    editoresArchivo.forEach(function(e) { lineas.push('  ' + e); });
+  } else {
+    lineas.push('  (no se ha podido leer la lista)');
+  }
+  lineas.push('', 'Propietaria: ' + (libro.getOwner() ? libro.getOwner().getEmail() : '—'));
+
+  const deHoja = sheet.getProtections(SpreadsheetApp.ProtectionType.SHEET);
+  if (deHoja.length) {
+    lineas.push('', '- - -', '', 'PROTECCIONES DE LA HOJA ENTERA (' + deHoja.length + ')', '');
+    deHoja.forEach(function(p) {
+      lineas.push('  · ' + (p.getDescription() || '(sin descripción)'));
+      lineas.push('    editores: ' + p.getEditors().map(function(u) {
+        return u.getEmail();
+      }).join(', '));
+    });
+  }
+
+  const deRango = sheet.getProtections(SpreadsheetApp.ProtectionType.RANGE);
+  lineas.push('', '- - -', '', 'INTERVALOS PROTEGIDOS (' + deRango.length + ')', '');
+
+  const sinAcceso = [];
+  deRango.forEach(function(p) {
+    const editores = p.getEditors().map(function(u) { return u.getEmail(); });
+    lineas.push('  · ' + (p.getDescription() || '(sin descripción)'));
+    lineas.push('    intervalo: ' + p.getRange().getA1Notation());
+    lineas.push('    editores: ' + (editores.join(', ') || '(solo la propietaria)'));
+    lineas.push('');
+
+    editores.forEach(function(e) {
+      if (editoresArchivo.length && editoresArchivo.indexOf(e) === -1 && sinAcceso.indexOf(e) === -1) {
+        sinAcceso.push(e);
+      }
+    });
+  });
+
+  if (sinAcceso.length) {
+    lineas.push('- - -', '', 'OJO: estas cuentas están en la lista de algún intervalo,',
+      'pero NO tienen acceso de edición al archivo, así que no van a',
+      'poder escribir igualmente. Compárteles el Sheet como editores:', '');
+    sinAcceso.forEach(function(e) { lineas.push('  ' + e); });
+  }
+
+  if (deRango.length > COLUMNAS_PROTEGIDAS.length) {
+    lineas.push('', '- - -', '',
+      'Hay más intervalos protegidos que columnas de aprobación. Si dos',
+      'protecciones cubren la misma celda, hay que estar en las dos listas.',
+      'Revisa si sobra alguna de una configuración anterior y bórrala desde',
+      'Datos -> Proteger hojas e intervalos.');
+  }
+
+  SpreadsheetApp.getUi().alert('Quién puede editar qué', lineas.join('\n'),
+    SpreadsheetApp.getUi().ButtonSet.OK);
+}
+
+/**
  * Avisa de qué desplegables no llegan hasta FILAS_PREPARADAS. Solo mira,
  * no toca nada.
  *
@@ -593,6 +679,7 @@ function onOpen() {
   SpreadsheetApp.getUi()
     .createMenu('Devoluciones')
     .addItem('Preparar columnas de seguimiento', 'configurarHoja')
+    .addItem('Ver quién puede editar qué', 'verProtecciones')
     .addItem('Revisar devoluciones incompletas', 'revisarTodo')
     .addToUi();
 }

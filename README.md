@@ -91,6 +91,20 @@ que un encabezado escrito en dos líneas dentro de la celda también encaja.
 Si aun así no se encuentra alguno, el menú abre una ventana con los títulos
 que hay de verdad en la fila 1 para poder compararlos.
 
+### Si alguien de la lista aun así no puede escribir
+
+Casi siempre es una de estas dos, y ninguna se ve desde la ventana de
+Google. El menú **Devoluciones → Ver quién puede editar qué** las detecta:
+
+1. **Esa cuenta no tiene acceso de edición al archivo.** Estar en la lista
+   de un intervalo protegido no se lo da: primero hay que compartirle el
+   Sheet como editor, desde el botón Compartir.
+2. **Hay otra protección encima del mismo intervalo.** Las protecciones se
+   suman, no se sustituyen: si dos cubren la misma celda, hay que estar en
+   las dos listas. Una protección vieja hecha a mano deja fuera a todo el
+   mundo aunque la nueva esté bien puesta. Se borran desde *Datos →
+   Proteger hojas e intervalos*.
+
 > Hacerlo desde el menú de Sheets (*Datos → Proteger hojas e intervalos*)
 > funciona, pero por defecto deja el intervalo en **"Solo tú"**: hay que
 > entrar en *Establecer permisos → Restringir quién puede editar este
