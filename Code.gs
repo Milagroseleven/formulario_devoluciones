@@ -168,8 +168,17 @@ const COLUMNAS_PROTEGIDAS = [
 const DESCRIPCION_PROTECCION = 'Validación restringida: ';
 
 const FONDO_FALTA = '#fde8e8';
-// Gris apagado de "esta celda no va contigo, no la rellenes".
-const FONDO_NO_APLICA = '#e3e6e8';
+
+// Colores de las dos columnas de validación. El gris tiene que verse
+// claramente más oscuro que la hoja para que lea como "casilla apagada";
+// uno demasiado suave se confunde con el fondo y no se entiende nada.
+const FONDO_NO_APLICA = '#c9ced3';
+const FONDO_PENDIENTE = '#fce8b2';
+
+const LEYENDA_VALIDACION =
+  'Gris: esta validación no aplica en esa fila, según el motivo de la devolución.\n' +
+  'Ámbar: falta esta validación, es la que toca.\n' +
+  'Sin color: ya está validada.';
 const NOTA_FALTA = 'Obligatorio al marcar "' + ESTADO_EFECTUADA + '".';
 
 // Hasta qué fila se dejan preparadas las listas desplegables.
@@ -395,6 +404,40 @@ function prepararSeguimiento_(sheet) {
   sheet.getRange(2, COL_IMPORTE, filas, 1).setNumberFormat('#,##0.00 €');
 }
 
+/**
+ * Estira las listas desplegables de las columnas de validación hasta
+ * FILAS_PREPARADAS.
+ *
+ * La lista la creaste tú sobre las filas que había en ese momento, así que
+ * las solicitudes nuevas caían fuera y llegaban sin desplegable. En vez de
+ * definir aquí las opciones (que serían dos sitios que mantener), se coge
+ * la regla que ya está puesta en la columna y se aplica hacia abajo.
+ */
+function extenderListas_(sheet) {
+  const col = posiciones_(sheet);
+  const ultima = Math.max(ultimaFilaConSolicitud_(sheet, columnaDe_(col, 'ID solicitud')), 2);
+  const estiradas = [];
+  const sinLista = [];
+
+  COLUMNAS_PROTEGIDAS.forEach(function(conf) {
+    const numero = buscarColumna_(col, conf.columna);
+    if (!numero) return;
+
+    const puestas = sheet.getRange(2, numero, ultima - 1, 1).getDataValidations();
+    let modelo = null;
+    for (let i = 0; i < puestas.length && !modelo; i++) modelo = puestas[i][0];
+
+    if (!modelo) {
+      sinLista.push(conf.columna);
+      return;
+    }
+    sheet.getRange(2, numero, FILAS_PREPARADAS - 1, 1).setDataValidation(modelo);
+    estiradas.push(conf.columna);
+  });
+
+  return { estiradas: estiradas, sinLista: sinLista };
+}
+
 /** Número de columna -> letra de la hoja (1 = A, 27 = AA). */
 function letraColumna_(numero) {
   let letra = '';
@@ -430,29 +473,51 @@ function aplicarSombreado_(sheet) {
   const motivo = '$' + letraColumna_(numeroMotivo) + '2';
   const esFinanciacion = 'OR(' + motivo + '="' + MOTIVO_FINANCIACION + '";' +
     motivo + '="' + MOTIVO_FINANCIACION_ANTIGUO + '")';
+  const hayMotivo = motivo + '<>""';
 
-  // La de dirección se apaga cuando el motivo es de financiación.
-  const formulaDireccion = '=' + esFinanciacion;
-  // La de Financiaciones se apaga con cualquier otro motivo ya elegido.
-  const formulaFinanciaciones = '=AND(' + motivo + '<>"";NOT(' + esFinanciacion + '))';
+  // Para cada columna: cuándo se apaga (no le toca) y cuándo está
+  // pendiente (le toca y todavía está vacía).
+  const propiaDireccion = '$' + letraColumna_(numeroDireccion) + '2';
+  const propiaFinanciaciones = '$' + letraColumna_(numeroFinanciaciones) + '2';
+
+  const apagarDireccion = '=' + esFinanciacion;
+  const pendienteDireccion = '=AND(' + hayMotivo + ';NOT(' + esFinanciacion + ');' +
+    propiaDireccion + '="")';
+
+  const apagarFinanciaciones = '=AND(' + hayMotivo + ';NOT(' + esFinanciacion + '))';
+  const pendienteFinanciaciones = '=AND(' + esFinanciacion + ';' +
+    propiaFinanciaciones + '="")';
 
   const filas = FILAS_PREPARADAS - 1;
+  const rangoDireccion = sheet.getRange(2, numeroDireccion, filas, 1);
+  const rangoFinanciaciones = sheet.getRange(2, numeroFinanciaciones, filas, 1);
+
+  function regla(formula, color, rango) {
+    return SpreadsheetApp.newConditionalFormatRule()
+      .whenFormulaSatisfied(formula)
+      .setBackground(color)
+      .setRanges([rango])
+      .build();
+  }
+
+  // El orden importa: en Sheets gana la primera regla que se cumple, y
+  // "apagada" tiene que pesar más que "pendiente".
   const nuevas = [
-    SpreadsheetApp.newConditionalFormatRule()
-      .whenFormulaSatisfied(formulaDireccion)
-      .setBackground(FONDO_NO_APLICA)
-      .setRanges([sheet.getRange(2, numeroDireccion, filas, 1)])
-      .build(),
-    SpreadsheetApp.newConditionalFormatRule()
-      .whenFormulaSatisfied(formulaFinanciaciones)
-      .setBackground(FONDO_NO_APLICA)
-      .setRanges([sheet.getRange(2, numeroFinanciaciones, filas, 1)])
-      .build(),
+    regla(apagarDireccion, FONDO_NO_APLICA, rangoDireccion),
+    regla(pendienteDireccion, FONDO_PENDIENTE, rangoDireccion),
+    regla(apagarFinanciaciones, FONDO_NO_APLICA, rangoFinanciaciones),
+    regla(pendienteFinanciaciones, FONDO_PENDIENTE, rangoFinanciaciones),
   ];
+
+  // La leyenda va en una nota sobre el título de cada columna, para que
+  // los colores se puedan consultar sin preguntarle a nadie.
+  sheet.getRange(1, numeroDireccion).setNote(LEYENDA_VALIDACION);
+  sheet.getRange(1, numeroFinanciaciones).setNote(LEYENDA_VALIDACION);
 
   // Se quitan solo las reglas que ha puesto este script (se reconocen por
   // su fórmula), para no tocar el formato condicional propio de la hoja.
-  const mias = [formulaDireccion, formulaFinanciaciones];
+  const mias = [apagarDireccion, pendienteDireccion,
+                apagarFinanciaciones, pendienteFinanciaciones];
   const ajenas = sheet.getConditionalFormatRules().filter(function(regla) {
     const condicion = regla.getBooleanCondition();
     if (!condicion) return true;
@@ -540,6 +605,7 @@ function configurarHoja() {
   const sheet = getHojaSolicitudes_();
   prepararSeguimiento_(sheet);
 
+  const listas = extenderListas_(sheet);
   const sombreado = aplicarSombreado_(sheet);
   const proteccion = protegerValidaciones_(sheet);
   revisarTodo();
@@ -547,9 +613,13 @@ function configurarHoja() {
   // Si algo no ha salido, se cuenta en una ventana en vez de en el aviso
   // pequeño de la esquina, que corta el texto justo cuando más falta hace
   // leerlo. Se listan los títulos reales de la hoja para poder comparar.
-  if (proteccion.fallos.length || !sombreado) {
+  if (proteccion.fallos.length || !sombreado || listas.sinLista.length) {
     const detalle = ['No se ha podido aplicar todo:', ''];
     proteccion.fallos.forEach(function(f) { detalle.push('  · ' + f); });
+    listas.sinLista.forEach(function(c) {
+      detalle.push('  · ' + c + ': no hay ninguna lista desplegable de la que ' +
+        'copiar. Pon la lista en una celda de esa columna y vuelve a ejecutar esto.');
+    });
     if (!sombreado) {
       detalle.push('  · Sombreado automático: falta alguna de las columnas de ' +
         'validación o la de "Motivo de la devolución".');
@@ -565,8 +635,8 @@ function configurarHoja() {
   }
 
   sheet.getParent().toast(
-    'Columnas preparadas. Bloqueadas: ' + proteccion.hechas.join(', ') +
-    '. Sombreado automático aplicado.',
+    'Listo. Bloqueadas y con la lista estirada: ' + proteccion.hechas.join(', ') +
+    '. Sombreado aplicado.',
     'Devoluciones', 10);
 }
 

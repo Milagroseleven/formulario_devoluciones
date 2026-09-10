@@ -108,10 +108,25 @@ validación que no toca sale sombreada en gris**:
 | `Financiación no aprobada` | Financiaciones | La de Gon / Jaime / Nacho |
 | Cualquier otro | Gon / Jaime / Nacho | La de Financiaciones |
 
-El gris es formato condicional que crea el propio script calculando dónde
-está cada columna, así que aparece y desaparece solo en cuanto cambia el
-motivo, sin esperar a nada. Si una fila no tiene motivo todavía, no se
-sombrea ninguna.
+Los colores son formato condicional que crea el propio script calculando
+dónde está cada columna, así que aparecen y desaparecen solos en cuanto
+cambia el motivo:
+
+| Color | Qué significa |
+| --- | --- |
+| Gris | Esa validación no aplica en esa fila. No hay que rellenarla |
+| Ámbar | Es la que toca y sigue vacía: está pendiente |
+| Sin color | Ya está validada |
+
+La leyenda queda también como nota sobre el título de las dos columnas, para
+poder consultarla sin preguntar. Si una fila no tiene motivo todavía, no se
+colorea ninguna.
+
+**Las listas desplegables se estiran solas.** La lista la creas tú en la
+columna; al ejecutar *Preparar columnas de seguimiento*, el script coge la
+que ya está puesta y la aplica hasta la fila 2000, para que las solicitudes
+nuevas lleguen con su desplegable. Las opciones no están en el código: se
+cambian en la hoja y basta con volver a ejecutar el menú.
 
 Las solicitudes registradas antes del cambio de nombre llevan el motivo
 antiguo, `Cancelación de financiación`. El sombreado también lo reconoce,

@@ -86,7 +86,7 @@ línea lleva su número a la izquierda:
 - Sube del todo con `Ctrl + Inicio`. La **línea 1** tiene que empezar por
   `/**`.
 - Baja del todo con `Ctrl + Fin`. La última línea tiene que ser `}` y el
-  número de línea rondar el **817**.
+  número de línea rondar el **887**.
 
 Si el número final es mucho menor, el pegado se quedó a medias: borra todo
 y repite.
