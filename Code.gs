@@ -85,11 +85,12 @@ const AVISO_MATRICULA = 'La matrícula no parece válida. Formatos admitidos: ' 
 // "Devolución efectuada", las tres columnas siguientes dejan de ser
 // opcionales: onEdit las marca en rojo y avisa hasta que estén rellenas.
 // ---------------------------------------------------------------------
+// Las opciones de los desplegables viven solo en la hoja, no aquí: el
+// script no las escribe nunca, para no borrar los colores de cada opción.
+// De "Estado devolución" solo necesita conocer estos dos valores, porque
+// son los que deciden qué campos pasan a ser obligatorios.
 const ESTADO_PENDIENTE = 'Pendiente';
 const ESTADO_EFECTUADA = 'Devolución efectuada';
-const ESTADOS = [ESTADO_PENDIENTE, ESTADO_EFECTUADA];
-
-const JUSTIFICANTE_OPCIONES = ['Ok', 'Pendiente'];
 
 const COL_ESTADO_NOMBRE = 'Estado devolución';
 const COL_FECHA_NOMBRE = 'Fecha transferencia';
@@ -390,58 +391,45 @@ function prepararSeguimiento_(sheet) {
     .setNumberFormat('#,##0.00 €');
 }
 
+// Columnas que llevan lista desplegable. El script NO las escribe: solo
+// comprueba que el intervalo llegue hasta abajo.
+const COLUMNAS_CON_LISTA = [
+  COL_ESTADO_NOMBRE,
+  COL_JUSTIFICANTE_NOMBRE,
+  COL_VALIDACION_FINANCIACIONES,
+  COL_VALIDACION_DIRECCION,
+];
+
 /**
- * Estira las listas desplegables de las columnas de validación hasta
- * FILAS_PREPARADAS.
+ * Avisa de qué desplegables no llegan hasta FILAS_PREPARADAS. Solo mira,
+ * no toca nada.
  *
- * La lista la creaste tú sobre las filas que había en ese momento, así que
- * las solicitudes nuevas caían fuera y llegaban sin desplegable. En vez de
- * definir aquí las opciones (que serían dos sitios que mantener), se coge
- * la regla que ya está puesta en la columna y se aplica hacia abajo.
+ * Antes el script estiraba él mismo las listas, y eso borraba los colores
+ * de las opciones: la API de Apps Script no conoce el color de cada
+ * elemento, así que al leer una lista y volver a escribirla se guardaba
+ * sin ellos. Da igual que se reutilice la regla que ya estaba puesta; el
+ * color se pierde igualmente.
+ *
+ * Por eso el intervalo se define una sola vez a mano, desde
+ * "Datos -> Validación de datos", poniéndolo hasta la fila 2000. Así las
+ * solicitudes nuevas ya caen dentro y aparecen con su desplegable y sus
+ * colores, sin que el script tenga que intervenir.
  */
-function extenderListas_(sheet) {
+function revisarDesplegables_(sheet) {
   const col = posiciones_(sheet);
-  const ultima = Math.max(ultimaFilaConSolicitud_(sheet, columnaDe_(col, 'ID solicitud')), 2);
-  const estiradas = [];
-  const sinLista = [];
+  const cortos = [];
 
-  // Las cuatro columnas con desplegable. "opciones" solo se usa si la
-  // columna no tiene ninguna lista todavía; mientras haya una puesta en la
-  // hoja, manda esa, con los colores y el orden que le hayas dado.
-  const conDesplegable = [
-    { columna: COL_ESTADO_NOMBRE, opciones: ESTADOS },
-    { columna: COL_JUSTIFICANTE_NOMBRE, opciones: JUSTIFICANTE_OPCIONES },
-    { columna: COL_VALIDACION_FINANCIACIONES, opciones: null },
-    { columna: COL_VALIDACION_DIRECCION, opciones: null },
-  ];
-
-  conDesplegable.forEach(function(conf) {
-    const numero = buscarColumna_(col, conf.columna);
+  COLUMNAS_CON_LISTA.forEach(function(titulo) {
+    const numero = buscarColumna_(col, titulo);
     if (!numero) return;
-
-    // Se busca la lista que ya está puesta en la columna y se aplica hacia
-    // abajo. Reutilizarla en vez de crear una nueva es lo que conserva los
-    // colores de las opciones: si se creara desde el código, se perderían.
-    const puestas = sheet.getRange(2, numero, ultima - 1, 1).getDataValidations();
-    let modelo = null;
-    for (let i = 0; i < puestas.length && !modelo; i++) modelo = puestas[i][0];
-
-    if (!modelo && conf.opciones) {
-      modelo = SpreadsheetApp.newDataValidation()
-        .requireValueInList(conf.opciones, true)
-        .setAllowInvalid(false)
-        .build();
+    // Si la última fila preparada tiene desplegable, el intervalo cubre
+    // de sobra las solicitudes que puedan entrar.
+    if (!sheet.getRange(FILAS_PREPARADAS, numero).getDataValidation()) {
+      cortos.push(titulo);
     }
-    if (!modelo) {
-      sinLista.push(conf.columna);
-      return;
-    }
-
-    sheet.getRange(2, numero, FILAS_PREPARADAS - 1, 1).setDataValidation(modelo);
-    estiradas.push(conf.columna);
   });
 
-  return { estiradas: estiradas, sinLista: sinLista };
+  return cortos;
 }
 
 /** Número de columna -> letra de la hoja (1 = A, 27 = AA). */
@@ -614,29 +602,44 @@ function configurarHoja() {
   const sheet = getHojaSolicitudes_();
   prepararSeguimiento_(sheet);
 
-  const listas = extenderListas_(sheet);
   const sombreado = aplicarSombreado_(sheet);
   const proteccion = protegerValidaciones_(sheet);
+  const cortos = revisarDesplegables_(sheet);
   revisarTodo();
 
   // Si algo no ha salido, se cuenta en una ventana en vez de en el aviso
   // pequeño de la esquina, que corta el texto justo cuando más falta hace
   // leerlo. Se listan los títulos reales de la hoja para poder comparar.
-  if (proteccion.fallos.length || !sombreado || listas.sinLista.length) {
-    const detalle = ['No se ha podido aplicar todo:', ''];
-    proteccion.fallos.forEach(function(f) { detalle.push('  · ' + f); });
-    listas.sinLista.forEach(function(c) {
-      detalle.push('  · ' + c + ': no hay ninguna lista desplegable de la que ' +
-        'copiar. Pon la lista en una celda de esa columna y vuelve a ejecutar esto.');
-    });
-    if (!sombreado) {
-      detalle.push('  · Sombreado automático: falta alguna de las columnas de ' +
-        'validación o la de "Motivo de la devolución".');
+  if (proteccion.fallos.length || !sombreado || cortos.length) {
+    const detalle = [];
+
+    if (proteccion.fallos.length || !sombreado) {
+      detalle.push('No se ha podido aplicar todo:', '');
+      proteccion.fallos.forEach(function(f) { detalle.push('  · ' + f); });
+      if (!sombreado) {
+        detalle.push('  · Sombreado automático: falta alguna de las columnas de ' +
+          'aprobación o la de "Motivo de la devolución".');
+      }
+      detalle.push('', 'Títulos que hay ahora en la fila 1:', '');
+      titulosDeLaHoja_(sheet).forEach(function(t) { detalle.push('  ' + t); });
+      detalle.push('', 'Copia el título tal cual de esta lista a COLUMNAS_PROTEGIDAS, ' +
+        'o corrige el de la hoja.');
     }
-    detalle.push('', 'Títulos que hay ahora en la fila 1:', '');
-    titulosDeLaHoja_(sheet).forEach(function(t) { detalle.push('  ' + t); });
-    detalle.push('', 'Copia el título tal cual de esta lista a COLUMNAS_PROTEGIDAS, ' +
-      'o corrige el de la hoja.');
+
+    if (cortos.length) {
+      if (detalle.length) detalle.push('', '- - -', '');
+      detalle.push('Estos desplegables no llegan hasta la fila ' + FILAS_PREPARADAS +
+        ', así que las solicitudes nuevas van a caer fuera y llegarán sin lista:', '');
+      cortos.forEach(function(c) { detalle.push('  · ' + c); });
+      detalle.push('',
+        'Se arregla una sola vez y a mano, para no perder los colores de las',
+        'opciones: haz clic en una celda de esa columna que ya tenga la lista,',
+        'entra en Datos -> Validación de datos, y en "Aplicar al intervalo"',
+        'cambia el final a la fila ' + FILAS_PREPARADAS + '.',
+        '',
+        'El script no toca las listas a propósito: al reescribirlas se pierden',
+        'los colores de cada opción.');
+    }
 
     SpreadsheetApp.getUi().alert('Devoluciones', detalle.join('\n'),
       SpreadsheetApp.getUi().ButtonSet.OK);
@@ -644,8 +647,8 @@ function configurarHoja() {
   }
 
   sheet.getParent().toast(
-    'Listo. Bloqueadas y con la lista estirada: ' + proteccion.hechas.join(', ') +
-    '. Sombreado aplicado.',
+    'Listo. Bloqueadas: ' + proteccion.hechas.join(', ') +
+    '. Sombreado aplicado y desplegables cubiertos.',
     'Devoluciones', 10);
 }
 

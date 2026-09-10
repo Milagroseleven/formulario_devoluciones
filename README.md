@@ -122,20 +122,16 @@ La leyenda queda también como nota sobre el título de las dos columnas, para
 poder consultarla sin preguntar. Si una fila no tiene motivo todavía, no se
 colorea ninguna.
 
-**Las listas desplegables se estiran solas.** Al ejecutar *Preparar columnas
-de seguimiento*, el script coge la lista que ya está puesta en cada columna
-y la aplica hasta la fila 2000, para que las solicitudes nuevas lleguen con
-su desplegable.
+**Las listas desplegables las gestionas tú, no el script.** El intervalo de
+cada una se define una sola vez desde *Datos → Validación de datos*,
+poniéndolo hasta la fila 2000. Así las solicitudes nuevas caen dentro y
+llegan con su desplegable, sin que el script tenga que hacer nada.
 
-Vale para las cuatro columnas con lista: las dos de aprobación, `Estado
-devolución` y la del justificante. **Siempre reutiliza la lista que hay en
-la hoja**, nunca la crea de nuevo, y por eso se conservan los colores y el
-orden que le hayas dado a cada opción. Las opciones se cambian en la hoja y
-basta con volver a ejecutar el menú.
-
-Las solicitudes registradas antes del cambio de nombre llevan el motivo
-antiguo, `Cancelación de financiación`. El sombreado también lo reconoce,
-así que esas filas se siguen viendo bien sin tener que tocarlas.
+> **Por qué no lo hace el script:** la API de Apps Script no conoce el color
+> de cada opción del desplegable. Al leer una lista y volver a escribirla,
+> se guarda sin colores, aunque se reutilice la regla que ya estaba puesta.
+> Por eso el script no escribe ninguna lista: solo avisa, al ejecutar
+> *Preparar columnas de seguimiento*, de cuáles no llegan hasta abajo.
 
 ## Seguimiento interno (las 4 últimas columnas)
 
