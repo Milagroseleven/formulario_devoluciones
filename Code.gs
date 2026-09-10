@@ -94,7 +94,8 @@ const JUSTIFICANTE_OPCIONES = ['Ok', 'Pendiente'];
 const COL_ESTADO_NOMBRE = 'Estado devolución';
 const COL_FECHA_NOMBRE = 'Fecha transferencia';
 const COL_IMPORTE_NOMBRE = 'Importe';
-const COL_JUSTIFICANTE_NOMBRE = 'Justificante enviado al comercial';
+const COL_JUSTIFICANTE_NOMBRE =
+  'Justificante enviado al comercial y/o al grupo de devolución de reservas';
 
 const HEADERS = [
   'Fecha registro',
@@ -144,8 +145,8 @@ const CUENTAS_SIEMPRE = [
   'milagros.gamboa@motickfamily.com',
 ];
 
-const COL_VALIDACION_FINANCIACIONES = 'Validación Financiaciones';
-const COL_VALIDACION_DIRECCION = 'Validación Gon / Jaime / Nacho';
+const COL_VALIDACION_FINANCIACIONES = 'Aprobación Financiaciones';
+const COL_VALIDACION_DIRECCION = 'Aprobación Gon / Jaime / Nacho';
 
 const COLUMNAS_PROTEGIDAS = [
   {
@@ -176,9 +177,9 @@ const FONDO_NO_APLICA = '#c9ced3';
 const FONDO_PENDIENTE = '#fce8b2';
 
 const LEYENDA_VALIDACION =
-  'Gris: esta validación no aplica en esa fila, según el motivo de la devolución.\n' +
-  'Ámbar: falta esta validación, es la que toca.\n' +
-  'Sin color: ya está validada.';
+  'Gris: esta aprobación no aplica en esa fila, según el motivo de la devolución.\n' +
+  'Ámbar: es la aprobación que toca y sigue pendiente.\n' +
+  'Ni gris ni ámbar: ya está aprobada.';
 const NOTA_FALTA = 'Obligatorio al marcar "' + ESTADO_EFECTUADA + '".';
 
 // Hasta qué fila se dejan preparadas las listas desplegables.
@@ -284,8 +285,8 @@ function posiciones_(sheet) {
  *
  * Primero compara el título tal cual (ya sin saltos de línea ni espacios
  * dobles). Si no aparece, lo intenta otra vez ignorando mayúsculas y todos
- * los espacios, para que "Validación Gon / Jaime / Nacho" y
- * "Validación Gon/Jaime/Nacho" cuenten como la misma columna.
+ * los espacios, para que "Aprobación Gon / Jaime / Nacho" y
+ * "Aprobación Gon/Jaime/Nacho" cuenten como la misma columna.
  */
 function buscarColumna_(mapa, titulo) {
   const exacto = mapa[normalizarTitulo_(titulo)];
@@ -381,27 +382,11 @@ function escribirSolicitud_(sheet, valores) {
 function prepararSeguimiento_(sheet) {
   const filas = FILAS_PREPARADAS - 1;
   const col = posiciones_(sheet);
-  const COL_ESTADO = columnaDe_(col, COL_ESTADO_NOMBRE);
-  const COL_FECHA = columnaDe_(col, COL_FECHA_NOMBRE);
-  const COL_IMPORTE = columnaDe_(col, COL_IMPORTE_NOMBRE);
-  const COL_JUSTIFICANTE = columnaDe_(col, COL_JUSTIFICANTE_NOMBRE);
 
-  const validacionEstado = SpreadsheetApp.newDataValidation()
-    .requireValueInList(ESTADOS, true)
-    .setAllowInvalid(false)
-    .setHelpText('Al marcar "' + ESTADO_EFECTUADA + '" hay que rellenar la fecha, ' +
-      'el importe y el justificante.')
-    .build();
-  sheet.getRange(2, COL_ESTADO, filas, 1).setDataValidation(validacionEstado);
-
-  const validacionJustificante = SpreadsheetApp.newDataValidation()
-    .requireValueInList(JUSTIFICANTE_OPCIONES, true)
-    .setAllowInvalid(false)
-    .build();
-  sheet.getRange(2, COL_JUSTIFICANTE, filas, 1).setDataValidation(validacionJustificante);
-
-  sheet.getRange(2, COL_FECHA, filas, 1).setNumberFormat('dd/mm/yyyy');
-  sheet.getRange(2, COL_IMPORTE, filas, 1).setNumberFormat('#,##0.00 €');
+  sheet.getRange(2, columnaDe_(col, COL_FECHA_NOMBRE), filas, 1)
+    .setNumberFormat('dd/mm/yyyy');
+  sheet.getRange(2, columnaDe_(col, COL_IMPORTE_NOMBRE), filas, 1)
+    .setNumberFormat('#,##0.00 €');
 }
 
 /**
@@ -419,18 +404,38 @@ function extenderListas_(sheet) {
   const estiradas = [];
   const sinLista = [];
 
-  COLUMNAS_PROTEGIDAS.forEach(function(conf) {
+  // Las cuatro columnas con desplegable. "opciones" solo se usa si la
+  // columna no tiene ninguna lista todavía; mientras haya una puesta en la
+  // hoja, manda esa, con los colores y el orden que le hayas dado.
+  const conDesplegable = [
+    { columna: COL_ESTADO_NOMBRE, opciones: ESTADOS },
+    { columna: COL_JUSTIFICANTE_NOMBRE, opciones: JUSTIFICANTE_OPCIONES },
+    { columna: COL_VALIDACION_FINANCIACIONES, opciones: null },
+    { columna: COL_VALIDACION_DIRECCION, opciones: null },
+  ];
+
+  conDesplegable.forEach(function(conf) {
     const numero = buscarColumna_(col, conf.columna);
     if (!numero) return;
 
+    // Se busca la lista que ya está puesta en la columna y se aplica hacia
+    // abajo. Reutilizarla en vez de crear una nueva es lo que conserva los
+    // colores de las opciones: si se creara desde el código, se perderían.
     const puestas = sheet.getRange(2, numero, ultima - 1, 1).getDataValidations();
     let modelo = null;
     for (let i = 0; i < puestas.length && !modelo; i++) modelo = puestas[i][0];
 
+    if (!modelo && conf.opciones) {
+      modelo = SpreadsheetApp.newDataValidation()
+        .requireValueInList(conf.opciones, true)
+        .setAllowInvalid(false)
+        .build();
+    }
     if (!modelo) {
       sinLista.push(conf.columna);
       return;
     }
+
     sheet.getRange(2, numero, FILAS_PREPARADAS - 1, 1).setDataValidation(modelo);
     estiradas.push(conf.columna);
   });
@@ -546,6 +551,16 @@ function protegerValidaciones_(sheet) {
   const hechas = [];
   const fallos = [];
 
+  // Se borran de una vez todas las protecciones puestas por este script,
+  // reconocidas por el principio de su descripción. Si se buscara la
+  // descripción exacta, al renombrar una columna la protección vieja se
+  // quedaría puesta sobre la columna antigua y acabaría habiendo dos.
+  sheet.getProtections(SpreadsheetApp.ProtectionType.RANGE).forEach(function(p) {
+    if (String(p.getDescription() || '').indexOf(DESCRIPCION_PROTECCION) === 0) {
+      p.remove();
+    }
+  });
+
   COLUMNAS_PROTEGIDAS.forEach(function(conf) {
     const numero = buscarColumna_(col, conf.columna);
     if (!numero) {
@@ -563,13 +578,6 @@ function protegerValidaciones_(sheet) {
 
     try {
       const descripcion = DESCRIPCION_PROTECCION + conf.columna;
-
-      // Se quita la protección anterior de esa misma columna, para no
-      // acumular una nueva cada vez que se ejecuta.
-      sheet.getProtections(SpreadsheetApp.ProtectionType.RANGE).forEach(function(p) {
-        if (p.getDescription() === descripcion) p.remove();
-      });
-
       const proteccion = sheet
         .getRange(2, numero, FILAS_PREPARADAS - 1, 1)
         .protect()

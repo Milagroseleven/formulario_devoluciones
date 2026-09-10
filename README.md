@@ -72,15 +72,15 @@ ejemplo `O2:Q2000`) para que cubra las filas que aún no existen.
 > La primera solicitud de una hoja vacía no tiene fila anterior de la que
 > copiar, así que ahí las fórmulas hay que ponerlas a mano una vez.
 
-## Validaciones: quién aprueba cada devolución
+## Aprobaciones: quién autoriza cada devolución
 
-Hay dos columnas de validación en la hoja, y **cada una solo la puede
+Hay dos columnas de aprobación en la hoja, y **cada una solo la puede
 escribir su gente**. El bloqueo lo aplica el script, no se pone a mano:
 
 | Columna | Quién puede escribir |
 | --- | --- |
-| `Validación Financiaciones` | financiaciones@ · las dos cuentas de servicio · la administradora |
-| `Validación Gon / Jaime / Nacho` | gonzalo@ · gonzalo.garnelo@gmail · jaime@ · nacho.carrion@ · las dos cuentas de servicio · la administradora |
+| `Aprobación Financiaciones` | financiaciones@ · las dos cuentas de servicio · la administradora |
+| `Aprobación Gon / Jaime / Nacho` | gonzalo@ · gonzalo.garnelo@gmail · jaime@ · nacho.carrion@ · las dos cuentas de servicio · la administradora |
 
 Las listas están en `COLUMNAS_PROTEGIDAS`, al principio de `Code.gs`. Al
 cambiarlas hay que ejecutar **Devoluciones → Preparar columnas de
@@ -122,11 +122,16 @@ La leyenda queda también como nota sobre el título de las dos columnas, para
 poder consultarla sin preguntar. Si una fila no tiene motivo todavía, no se
 colorea ninguna.
 
-**Las listas desplegables se estiran solas.** La lista la creas tú en la
-columna; al ejecutar *Preparar columnas de seguimiento*, el script coge la
-que ya está puesta y la aplica hasta la fila 2000, para que las solicitudes
-nuevas lleguen con su desplegable. Las opciones no están en el código: se
-cambian en la hoja y basta con volver a ejecutar el menú.
+**Las listas desplegables se estiran solas.** Al ejecutar *Preparar columnas
+de seguimiento*, el script coge la lista que ya está puesta en cada columna
+y la aplica hasta la fila 2000, para que las solicitudes nuevas lleguen con
+su desplegable.
+
+Vale para las cuatro columnas con lista: las dos de aprobación, `Estado
+devolución` y la del justificante. **Siempre reutiliza la lista que hay en
+la hoja**, nunca la crea de nuevo, y por eso se conservan los colores y el
+orden que le hayas dado a cada opción. Las opciones se cambian en la hoja y
+basta con volver a ejecutar el menú.
 
 Las solicitudes registradas antes del cambio de nombre llevan el motivo
 antiguo, `Cancelación de financiación`. El sombreado también lo reconoce,
@@ -143,7 +148,7 @@ las filas en `Pendiente` y las va cerrando.
 | `Estado devolución` | Desplegable `Pendiente` / `Devolución efectuada`. Toda solicitud nueva entra como `Pendiente` |
 | `Fecha transferencia` | Fecha a mano, formato `dd/mm/aaaa` |
 | `Importe` | Importe devuelto, formato euros |
-| `Justificante enviado al comercial` | Desplegable `Ok` / `Pendiente` |
+| `Justificante enviado al comercial y/o al grupo de devolución de reservas` | Desplegable `Ok` / `Pendiente` |
 
 Al pasar una fila a **`Devolución efectuada`**, las otras tres columnas se
 vuelven obligatorias: las que estén vacías se pintan de rojo, les aparece
