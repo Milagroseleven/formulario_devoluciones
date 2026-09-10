@@ -107,12 +107,6 @@ const HEADERS = [
   COL_JUSTIFICANTE_NOMBRE,
 ];
 
-// Posiciones (1 = columna A) de las columnas de seguimiento.
-const COL_ESTADO = HEADERS.indexOf(COL_ESTADO_NOMBRE) + 1;
-const COL_FECHA = HEADERS.indexOf(COL_FECHA_NOMBRE) + 1;
-const COL_IMPORTE = HEADERS.indexOf(COL_IMPORTE_NOMBRE) + 1;
-const COL_JUSTIFICANTE = HEADERS.indexOf(COL_JUSTIFICANTE_NOMBRE) + 1;
-
 const FONDO_FALTA = '#fde8e8';
 const NOTA_FALTA = 'Obligatorio al marcar "' + ESTADO_EFECTUADA + '".';
 
@@ -178,6 +172,97 @@ function getHojaSolicitudes_() {
   return sheet;
 }
 
+// ---------------------------------------------------------------------
+// POSICIÓN DE LAS COLUMNAS
+//
+// El script busca cada columna por su título en la fila 1, no por su
+// posición. Así se pueden insertar, mover o quitar columnas en la hoja
+// (fórmulas, indicadores, lo que haga falta) sin tocar el código: mientras
+// los títulos de las columnas que escribe el formulario no cambien, todo
+// sigue cuadrando.
+// ---------------------------------------------------------------------
+
+/** Título de cada columna -> su número (1 = columna A). */
+function posiciones_(sheet) {
+  const cabeceras = sheet.getRange(1, 1, 1, sheet.getMaxColumns()).getValues()[0];
+  const mapa = {};
+  for (let i = 0; i < cabeceras.length; i++) {
+    const titulo = String(cabeceras[i] || '').trim();
+    // Si hubiera dos columnas con el mismo título, manda la primera.
+    if (titulo && !(titulo in mapa)) mapa[titulo] = i + 1;
+  }
+  return mapa;
+}
+
+/** Como posiciones_, pero avisa claro si falta una columna esperada. */
+function columnaDe_(mapa, titulo) {
+  const col = mapa[titulo];
+  if (!col) {
+    throw new Error('No se encuentra la columna "' + titulo + '" en la fila 1 de la ' +
+      'pestaña "' + SHEET_NAME + '". Si la has renombrado, hay que volver a ponerle ' +
+      'el título original.');
+  }
+  return col;
+}
+
+/**
+ * Última fila que contiene una solicitud de verdad. No se usa getLastRow()
+ * porque las columnas de fórmulas pueden estar arrastradas hacia abajo
+ * cientos de filas, y entonces las solicitudes nuevas se irían al final de
+ * la hoja dejando un hueco enorme.
+ */
+function ultimaFilaConSolicitud_(sheet, colReferencia) {
+  const maximo = sheet.getMaxRows();
+  if (maximo < 2) return 1;
+  const valores = sheet.getRange(2, colReferencia, maximo - 1, 1).getValues();
+  for (let i = valores.length - 1; i >= 0; i--) {
+    if (valores[i][0] !== '' && valores[i][0] !== null) return i + 2;
+  }
+  return 1;
+}
+
+/**
+ * Copia en la fila nueva las fórmulas de la fila anterior, con su formato.
+ * No hay lista de columnas que copiar: se detectan solas mirando cuáles
+ * llevaban fórmula, así que añadir o quitar columnas calculadas en la hoja
+ * no obliga a tocar el código.
+ */
+function copiarFormulas_(sheet, destino) {
+  const origen = destino - 1;
+  if (origen < 2) return;  // la primera solicitud no tiene de dónde copiar
+
+  const ancho = sheet.getLastColumn();
+  const formulas = sheet.getRange(origen, 1, 1, ancho).getFormulas()[0];
+  for (let i = 0; i < formulas.length; i++) {
+    if (!formulas[i]) continue;
+    sheet.getRange(origen, i + 1).copyTo(sheet.getRange(destino, i + 1));
+  }
+}
+
+/**
+ * Escribe una solicitud en la primera fila libre y arrastra a esa fila las
+ * fórmulas de la anterior.
+ *
+ * No se usa appendRow porque escribe por posición: en cuanto se inserta
+ * una columna en medio de la hoja, los datos se irían a la columna
+ * equivocada y pisarían lo que hubiera allí. Aquí cada valor se escribe en
+ * la columna que lleva su título, y lo demás se queda como está.
+ */
+function escribirSolicitud_(sheet, valores) {
+  const col = posiciones_(sheet);
+  const destino = ultimaFilaConSolicitud_(sheet, columnaDe_(col, 'ID solicitud')) + 1;
+
+  // Primero las fórmulas: así, si alguna calcula sobre los datos de su
+  // propia fila, se recalcula sola en cuanto se escriben debajo.
+  copiarFormulas_(sheet, destino);
+
+  Object.keys(valores).forEach(function(titulo) {
+    sheet.getRange(destino, columnaDe_(col, titulo)).setValue(valores[titulo]);
+  });
+
+  return destino;
+}
+
 /**
  * Deja listas las columnas de seguimiento: desplegables, formato de fecha
  * y formato de importe. Se aplica de golpe hasta FILAS_PREPARADAS para que
@@ -185,6 +270,11 @@ function getHojaSolicitudes_() {
  */
 function prepararSeguimiento_(sheet) {
   const filas = FILAS_PREPARADAS - 1;
+  const col = posiciones_(sheet);
+  const COL_ESTADO = columnaDe_(col, COL_ESTADO_NOMBRE);
+  const COL_FECHA = columnaDe_(col, COL_FECHA_NOMBRE);
+  const COL_IMPORTE = columnaDe_(col, COL_IMPORTE_NOMBRE);
+  const COL_JUSTIFICANTE = columnaDe_(col, COL_JUSTIFICANTE_NOMBRE);
 
   const validacionEstado = SpreadsheetApp.newDataValidation()
     .requireValueInList(ESTADOS, true)
@@ -227,10 +317,11 @@ function configurarHoja() {
  */
 function revisarTodo() {
   const sheet = getHojaSolicitudes_();
-  const ultima = sheet.getLastRow();
+  const col = posiciones_(sheet);
+  const ultima = ultimaFilaConSolicitud_(sheet, columnaDe_(col, 'ID solicitud'));
   let incompletas = 0;
   for (let fila = 2; fila <= ultima; fila++) {
-    if (revisarFila_(sheet, fila)) incompletas++;
+    if (revisarFila_(sheet, fila, col)) incompletas++;
   }
   sheet.getParent().toast(
     incompletas === 0
@@ -243,9 +334,14 @@ function revisarTodo() {
  * Revisa una fila y devuelve true si le falta algo. Las celdas que faltan
  * quedan en rojo y con una nota; las que ya están, limpias.
  */
-function revisarFila_(sheet, fila) {
-  const estado = sheet.getRange(fila, COL_ESTADO).getValue();
-  const columnas = [COL_FECHA, COL_IMPORTE, COL_JUSTIFICANTE];
+function revisarFila_(sheet, fila, col) {
+  col = col || posiciones_(sheet);
+  const estado = sheet.getRange(fila, columnaDe_(col, COL_ESTADO_NOMBRE)).getValue();
+  const columnas = [
+    columnaDe_(col, COL_FECHA_NOMBRE),
+    columnaDe_(col, COL_IMPORTE_NOMBRE),
+    columnaDe_(col, COL_JUSTIFICANTE_NOMBRE),
+  ];
   const exigir = estado === ESTADO_EFECTUADA;
   let faltan = 0;
 
@@ -274,9 +370,17 @@ function onEdit(e) {
   const fila = e.range.getRow();
   const columna = e.range.getColumn();
   if (fila < 2) return;
-  if ([COL_ESTADO, COL_FECHA, COL_IMPORTE, COL_JUSTIFICANTE].indexOf(columna) === -1) return;
 
-  const faltan = revisarFila_(sheet, fila);
+  const col = posiciones_(sheet);
+  const vigiladas = [
+    col[COL_ESTADO_NOMBRE],
+    col[COL_FECHA_NOMBRE],
+    col[COL_IMPORTE_NOMBRE],
+    col[COL_JUSTIFICANTE_NOMBRE],
+  ];
+  if (vigiladas.indexOf(columna) === -1) return;
+
+  const faltan = revisarFila_(sheet, fila, col);
   if (faltan) {
     sheet.getParent().toast(
       'Marcaste "' + ESTADO_EFECTUADA + '": faltan por rellenar los campos en rojo ' +
@@ -406,6 +510,36 @@ function submitDevolucion(data) {
   const ahora = new Date();
   const id = nuevoId_(ahora);
 
+  // Cada dato va a la columna que lleve ese título, esté donde esté. Las
+  // columnas que no aparecen aquí (las de fórmulas, por ejemplo) no se
+  // tocan: se rellenan solas al copiar la fila anterior.
+  const valores = {};
+  valores['Fecha registro'] = ahora;
+  valores['ID solicitud'] = id;
+  valores['Nombre y apellidos'] = nombre;
+  valores['Teléfono de contacto'] = telefono;
+  valores['Correo electrónico'] = correo;
+  valores['Fecha de la reserva'] = data.fechaReserva;
+  valores['Modalidad de reserva'] = data.modalidad;
+  valores['Modelo de la moto'] = modelo;
+  valores['Matrícula o código'] = matricula;
+  valores['Comercial'] = comercial;
+  valores['Motivo de la devolución'] = data.motivo;
+  valores['Detalle del motivo'] = detalleMotivo;
+  valores['Número de cuenta (IBAN)'] = iban;
+  valores[COL_ESTADO_NOMBRE] = ESTADO_PENDIENTE;
+
+  const COL_CERTIFICADO_NOMBRE = 'Certificado de titularidad (Drive)';
+
+  // Se comprueba que la hoja tiene todas esas columnas antes de subir nada
+  // a Drive: si algún título no cuadra, es mejor fallar aquí que dejar el
+  // certificado huérfano en la carpeta.
+  const sheet = getHojaSolicitudes_();
+  const col = posiciones_(sheet);
+  Object.keys(valores).concat([COL_CERTIFICADO_NOMBRE]).forEach(function(titulo) {
+    columnaDe_(col, titulo);
+  });
+
   const nombreArchivo = sanitize_([
     matricula,
     'Certificado titularidad',
@@ -415,29 +549,9 @@ function submitDevolucion(data) {
 
   const decoded = Utilities.base64Decode(data.fileBase64);
   const blob = Utilities.newBlob(decoded, data.fileMimeType, nombreArchivo);
-  const fileUrl = getCarpeta_().createFile(blob).getUrl();
+  valores[COL_CERTIFICADO_NOMBRE] = getCarpeta_().createFile(blob).getUrl();
 
-  const sheet = getHojaSolicitudes_();
-  sheet.appendRow([
-    ahora,
-    id,
-    nombre,
-    telefono,
-    correo,
-    data.fechaReserva,
-    data.modalidad,
-    modelo,
-    matricula,
-    comercial,
-    data.motivo,
-    detalleMotivo,
-    iban,
-    fileUrl,
-    ESTADO_PENDIENTE,
-    '',
-    '',
-    '',
-  ]);
+  escribirSolicitud_(sheet, valores);
 
   return { id: id };
 }

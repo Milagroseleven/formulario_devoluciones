@@ -51,6 +51,27 @@ público y recoge datos bancarios.
 - **ID de solicitud**: `DEV-<aaaammdd>-<4 caracteres>`. Se le muestra al
   cliente al terminar, con un botón para copiarlo.
 
+## Columnas propias en la hoja
+
+El script **busca cada columna por su título en la fila 1**, no por su
+posición. Eso permite insertar, mover o quitar columnas en la hoja sin tocar
+el código: columnas de fórmulas, indicadores, lo que haga falta.
+
+Dos reglas para que siga funcionando:
+
+- **No renombrar** las columnas que escribe el formulario. Si falta alguna,
+  el envío falla con un aviso diciendo cuál, antes de subir nada a Drive.
+- Las columnas con **fórmulas se arrastran solas**: al entrar una solicitud,
+  el script copia a la fila nueva las fórmulas de la fila anterior, con su
+  formato. Se detectan solas, no hay que declararlas en ningún sitio.
+
+El **formato condicional** no lo gestiona el script: es una regla de Sheets
+que se aplica a un rango. Conviene definirla sobre un rango amplio (por
+ejemplo `O2:Q2000`) para que cubra las filas que aún no existen.
+
+> La primera solicitud de una hoja vacía no tiene fila anterior de la que
+> copiar, así que ahí las fórmulas hay que ponerlas a mano una vez.
+
 ## Seguimiento interno (las 4 últimas columnas)
 
 Estas columnas no las toca el cliente: las lleva el encargado a mano sobre
