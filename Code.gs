@@ -170,16 +170,17 @@ const DESCRIPCION_PROTECCION = 'Validación restringida: ';
 
 const FONDO_FALTA = '#fde8e8';
 
-// Colores de las dos columnas de validación. El gris tiene que verse
+// Colores de las dos columnas de aprobación. El gris tiene que verse
 // claramente más oscuro que la hoja para que lea como "casilla apagada";
 // uno demasiado suave se confunde con el fondo y no se entiende nada.
+// El amarillo es el estándar de Sheets: se busca que salte a la vista.
 const FONDO_NO_APLICA = '#c9ced3';
-const FONDO_PENDIENTE = '#fce8b2';
+const FONDO_PENDIENTE = '#ffff00';
 
 const LEYENDA_VALIDACION =
   'Gris: esta aprobación no aplica en esa fila, según el motivo de la devolución.\n' +
-  'Ámbar: es la aprobación que toca y sigue pendiente.\n' +
-  'Ni gris ni ámbar: ya está aprobada.';
+  'Amarillo: es la aprobación que toca y sigue pendiente.\n' +
+  'Ni gris ni amarillo: ya está aprobada.';
 const NOTA_FALTA = 'Obligatorio al marcar "' + ESTADO_EFECTUADA + '".';
 
 // Hasta qué fila se dejan preparadas las listas desplegables.
