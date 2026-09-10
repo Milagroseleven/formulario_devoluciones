@@ -30,7 +30,7 @@ derivados y con los textos redactados para una persona externa a la empresa.
 | 6 | Modelo de la moto | Sí | |
 | 7 | Matrícula | Sí | Valida el formato: 3720 KDV, A 108859, M 8214 YV, C 2107 BWM, con el número de unidad opcional al final |
 | 8 | Nombre del comercial | Sí | Quien atendió al cliente |
-| 9 | Motivo de la devolución | Sí | Cancelación de financiación · Desistimiento · Motivos personales · Otros |
+| 9 | Motivo de la devolución | Sí | Financiación no aprobada · Desistimiento · Motivos personales · Otros. Decide quién valida la devolución |
 | 10 | Explica el motivo | Solo si el motivo es "Otros" | Aparece únicamente al elegir "Otros" |
 | 11 | Número de cuenta (IBAN) | Sí | Se valida con el dígito de control (ISO 13616) |
 | 12 | Certificado de titularidad | Sí | PDF o imagen, hasta 10 MB |
@@ -71,6 +71,46 @@ ejemplo `O2:Q2000`) para que cubra las filas que aún no existen.
 
 > La primera solicitud de una hoja vacía no tiene fila anterior de la que
 > copiar, así que ahí las fórmulas hay que ponerlas a mano una vez.
+
+## Validaciones: quién aprueba cada devolución
+
+Hay dos columnas de validación en la hoja, y **cada una solo la puede
+escribir su gente**. El bloqueo lo aplica el script, no se pone a mano:
+
+| Columna | Quién puede escribir |
+| --- | --- |
+| `Validación Financiaciones` | financiaciones@ · las dos cuentas de servicio · la administradora |
+| `Validación Gon / Jaime / Nacho` | gonzalo@ · gonzalo.garnelo@gmail · jaime@ · nacho.carrion@ · las dos cuentas de servicio · la administradora |
+
+Las listas están en `COLUMNAS_PROTEGIDAS`, al principio de `Code.gs`. Al
+cambiarlas hay que ejecutar **Devoluciones → Preparar columnas de
+seguimiento** para que se apliquen.
+
+> Hacerlo desde el menú de Sheets (*Datos → Proteger hojas e intervalos*)
+> funciona, pero por defecto deja el intervalo en **"Solo tú"**: hay que
+> entrar en *Establecer permisos → Restringir quién puede editar este
+> intervalo → Personalizado* y marcar a cada persona. Y las cuentas de
+> servicio no aparecen en ese buscador, así que por script es el único
+> camino cómodo para incluirlas.
+
+### Cuál hace falta en cada fila
+
+Depende del motivo de la devolución, y se ve de un vistazo porque **la
+validación que no toca sale sombreada en gris**:
+
+| Motivo | Valida | Se sombrea |
+| --- | --- | --- |
+| `Financiación no aprobada` | Financiaciones | La de Gon / Jaime / Nacho |
+| Cualquier otro | Gon / Jaime / Nacho | La de Financiaciones |
+
+El gris es formato condicional que crea el propio script calculando dónde
+está cada columna, así que aparece y desaparece solo en cuanto cambia el
+motivo, sin esperar a nada. Si una fila no tiene motivo todavía, no se
+sombrea ninguna.
+
+Las solicitudes registradas antes del cambio de nombre llevan el motivo
+antiguo, `Cancelación de financiación`. El sombreado también lo reconoce,
+así que esas filas se siguen viendo bien sin tener que tocarlas.
 
 ## Seguimiento interno (las 4 últimas columnas)
 
@@ -133,7 +173,8 @@ Todo lo configurable está al principio de `Code.gs`:
 | `HOJA_ID` | Sheet que recibe las solicitudes. Vacío = la hoja en la que vive el script |
 | `EMPRESA` / `NIF` | Aparecen bajo el título del formulario |
 | `MODALIDADES` | Opciones del campo 5 |
-| `MOTIVOS` | Opciones del campo 9 |
+| `MOTIVOS` | Opciones del campo 9. `MOTIVO_FINANCIACION` es el que decide quién valida |
+| `COLUMNAS_PROTEGIDAS` | Qué cuentas pueden escribir en cada columna de validación |
 | `TAMANO_MAXIMO_MB` | Peso máximo del certificado |
 
 Añadir una modalidad o un motivo es tocar una sola lista: el formulario las
@@ -155,10 +196,9 @@ funciona en la hoja que contiene el script.
 
 ## Pendiente de confirmar
 
-- **Quién puede autorizar una devolución.** Hoy cualquiera con acceso de
-  edición al Sheet puede marcar una como efectuada. Está pendiente de que
-  dirección decida si hace falta restringirlo a unas personas concretas, y
-  de qué manera.
+- **Quién puede marcar una devolución como efectuada.** Las dos columnas de
+  validación ya están restringidas, pero la columna `Estado devolución`
+  sigue abierta a cualquiera con edición en la hoja.
 
 - Texto legal exacto de la casilla de consentimiento (ahora hay una
   redacción provisional) y si hay que enlazar una política de privacidad.

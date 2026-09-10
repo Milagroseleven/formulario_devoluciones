@@ -47,8 +47,18 @@ const MODALIDADES = [
 
 // Motivos de la devolución. "Otros" obliga a especificar.
 const MOTIVO_OTROS = 'Otros';
+
+// Este motivo decide quién tiene que validar la devolución: si la
+// financiación no salió, valida Financiaciones; en cualquier otro caso,
+// valida dirección. De ahí que tenga constante propia.
+const MOTIVO_FINANCIACION = 'Financiación no aprobada';
+
+// Nombre anterior del mismo motivo. Se conserva solo para que las
+// solicitudes registradas antes del cambio se sigan sombreando bien.
+const MOTIVO_FINANCIACION_ANTIGUO = 'Cancelación de financiación';
+
 const MOTIVOS = [
-  'Cancelación de financiación',
+  MOTIVO_FINANCIACION,
   'Desistimiento',
   'Motivos personales',
   MOTIVO_OTROS,
@@ -107,7 +117,58 @@ const HEADERS = [
   COL_JUSTIFICANTE_NOMBRE,
 ];
 
+// ---------------------------------------------------------------------
+// COLUMNAS DE VALIDACIÓN PROTEGIDAS
+//
+// Cada una de estas columnas solo la pueden escribir las cuentas de su
+// lista. Lo impide Google, no el script: quien no esté en la lista recibe
+// un aviso y no puede escribir ahí, aunque pueda editar el resto de la
+// hoja. Las listas desplegables de esas celdas las pone la hoja, no el
+// código; aquí solo se aplica el bloqueo.
+//
+// El título tiene que coincidir **exactamente** con el de la fila 1. Si no
+// se encuentra, el menú avisa de cuál falta en vez de bloquear otra cosa.
+//
+// Al cambiar estas listas hay que volver a ejecutar
+// "Devoluciones -> Preparar columnas de seguimiento" para que se aplique.
+//
+// Ojo: estar en la lista no da acceso al Sheet. Cada cuenta necesita
+// además permiso de edición sobre el archivo, o no podrá ni abrirlo.
+// ---------------------------------------------------------------------
+// Cuentas que entran en las dos listas: las automatizaciones y la persona
+// que administra la hoja.
+const CUENTAS_SIEMPRE = [
+  'conciliacion-ventas@conciliacion-ventas.iam.gserviceaccount.com',
+  'onboarding@motick-onboarding.iam.gserviceaccount.com',
+  'milagros.gamboa@motickfamily.com',
+];
+
+const COL_VALIDACION_FINANCIACIONES = 'Validación Financiaciones';
+const COL_VALIDACION_DIRECCION = 'Validación Gon / Jaime / Nacho';
+
+const COLUMNAS_PROTEGIDAS = [
+  {
+    columna: COL_VALIDACION_FINANCIACIONES,
+    correos: [
+      'financiaciones@motickfamily.com',
+    ].concat(CUENTAS_SIEMPRE),
+  },
+  {
+    columna: COL_VALIDACION_DIRECCION,
+    correos: [
+      'gonzalo@motickfamily.com',
+      'gonzalo.garnelo@gmail.com',
+      'jaime@motickfamily.com',
+      'nacho.carrion@motickfamily.com',
+    ].concat(CUENTAS_SIEMPRE),
+  },
+];
+
+const DESCRIPCION_PROTECCION = 'Validación restringida: ';
+
 const FONDO_FALTA = '#fde8e8';
+// Gris apagado de "esta celda no va contigo, no la rellenes".
+const FONDO_NO_APLICA = '#e3e6e8';
 const NOTA_FALTA = 'Obligatorio al marcar "' + ESTADO_EFECTUADA + '".';
 
 // Hasta qué fila se dejan preparadas las listas desplegables.
@@ -294,6 +355,137 @@ function prepararSeguimiento_(sheet) {
   sheet.getRange(2, COL_IMPORTE, filas, 1).setNumberFormat('#,##0.00 €');
 }
 
+/** Número de columna -> letra de la hoja (1 = A, 27 = AA). */
+function letraColumna_(numero) {
+  let letra = '';
+  while (numero > 0) {
+    const resto = (numero - 1) % 26;
+    letra = String.fromCharCode(65 + resto) + letra;
+    numero = Math.floor((numero - resto) / 26);
+  }
+  return letra;
+}
+
+/**
+ * Sombrea en gris la validación que NO hace falta en cada fila, según el
+ * motivo de la devolución:
+ *
+ *   - "Financiación no aprobada"  -> valida Financiaciones,
+ *                                    se sombrea la de dirección.
+ *   - cualquier otro motivo       -> valida dirección,
+ *                                    se sombrea la de Financiaciones.
+ *
+ * Se hace con formato condicional en vez de pintando celdas desde el
+ * script: así el gris aparece y desaparece solo en cuanto cambia el
+ * motivo, sin esperar a que se ejecute nada.
+ */
+function aplicarSombreado_(sheet) {
+  const col = posiciones_(sheet);
+  const numeroMotivo = col['Motivo de la devolución'];
+  const numeroFinanciaciones = col[COL_VALIDACION_FINANCIACIONES];
+  const numeroDireccion = col[COL_VALIDACION_DIRECCION];
+
+  if (!numeroMotivo || !numeroFinanciaciones || !numeroDireccion) return false;
+
+  const motivo = '$' + letraColumna_(numeroMotivo) + '2';
+  const esFinanciacion = 'OR(' + motivo + '="' + MOTIVO_FINANCIACION + '";' +
+    motivo + '="' + MOTIVO_FINANCIACION_ANTIGUO + '")';
+
+  // La de dirección se apaga cuando el motivo es de financiación.
+  const formulaDireccion = '=' + esFinanciacion;
+  // La de Financiaciones se apaga con cualquier otro motivo ya elegido.
+  const formulaFinanciaciones = '=AND(' + motivo + '<>"";NOT(' + esFinanciacion + '))';
+
+  const filas = FILAS_PREPARADAS - 1;
+  const nuevas = [
+    SpreadsheetApp.newConditionalFormatRule()
+      .whenFormulaSatisfied(formulaDireccion)
+      .setBackground(FONDO_NO_APLICA)
+      .setRanges([sheet.getRange(2, numeroDireccion, filas, 1)])
+      .build(),
+    SpreadsheetApp.newConditionalFormatRule()
+      .whenFormulaSatisfied(formulaFinanciaciones)
+      .setBackground(FONDO_NO_APLICA)
+      .setRanges([sheet.getRange(2, numeroFinanciaciones, filas, 1)])
+      .build(),
+  ];
+
+  // Se quitan solo las reglas que ha puesto este script (se reconocen por
+  // su fórmula), para no tocar el formato condicional propio de la hoja.
+  const mias = [formulaDireccion, formulaFinanciaciones];
+  const ajenas = sheet.getConditionalFormatRules().filter(function(regla) {
+    const condicion = regla.getBooleanCondition();
+    if (!condicion) return true;
+    const valores = condicion.getCriteriaValues() || [];
+    return mias.indexOf(String(valores[0])) === -1;
+  });
+
+  sheet.setConditionalFormatRules(ajenas.concat(nuevas));
+  return true;
+}
+
+/**
+ * Bloquea cada columna de COLUMNAS_PROTEGIDAS para todo el mundo menos las
+ * cuentas de su lista.
+ *
+ * Se procesa columna por columna y se recogen los fallos en vez de cortar
+ * a la primera: así un título mal escrito o un correo sin acceso al
+ * archivo no impide proteger las demás.
+ *
+ * Aviso: a la propietaria del Sheet no se la puede dejar fuera. Google
+ * siempre le permite editar cualquier celda de su propio archivo.
+ */
+function protegerValidaciones_(sheet) {
+  const col = posiciones_(sheet);
+  const yo = Session.getEffectiveUser().getEmail();
+  const hechas = [];
+  const fallos = [];
+
+  COLUMNAS_PROTEGIDAS.forEach(function(conf) {
+    const numero = col[conf.columna];
+    if (!numero) {
+      fallos.push(conf.columna + ' (no existe esa columna en la fila 1)');
+      return;
+    }
+
+    const correos = conf.correos
+      .map(function(c) { return String(c || '').trim(); })
+      .filter(Boolean);
+    if (!correos.length) {
+      fallos.push(conf.columna + ' (sin cuentas en la lista)');
+      return;
+    }
+
+    try {
+      const descripcion = DESCRIPCION_PROTECCION + conf.columna;
+
+      // Se quita la protección anterior de esa misma columna, para no
+      // acumular una nueva cada vez que se ejecuta.
+      sheet.getProtections(SpreadsheetApp.ProtectionType.RANGE).forEach(function(p) {
+        if (p.getDescription() === descripcion) p.remove();
+      });
+
+      const proteccion = sheet
+        .getRange(2, numero, FILAS_PREPARADAS - 1, 1)
+        .protect()
+        .setDescription(descripcion);
+
+      const sobran = proteccion.getEditors()
+        .map(function(u) { return u.getEmail(); })
+        .filter(function(e) { return e && e !== yo && correos.indexOf(e) === -1; });
+      if (sobran.length) proteccion.removeEditors(sobran);
+
+      proteccion.addEditors(correos);
+      if (proteccion.canDomainEdit()) proteccion.setDomainEdit(false);
+      hechas.push(conf.columna);
+    } catch (err) {
+      fallos.push(conf.columna + ' (' + err.message + ')');
+    }
+  });
+
+  return { hechas: hechas, fallos: fallos };
+}
+
 /** Menú propio de la hoja, para poder relanzar la configuración a mano. */
 function onOpen() {
   SpreadsheetApp.getUi()
@@ -307,8 +499,23 @@ function onOpen() {
 function configurarHoja() {
   const sheet = getHojaSolicitudes_();
   prepararSeguimiento_(sheet);
+
+  const sombreado = aplicarSombreado_(sheet);
+  const proteccion = protegerValidaciones_(sheet);
   revisarTodo();
-  sheet.getParent().toast('Columnas de seguimiento preparadas.', 'Devoluciones', 5);
+
+  const partes = ['Columnas de seguimiento preparadas.'];
+  if (proteccion.hechas.length) {
+    partes.push('Bloqueadas: ' + proteccion.hechas.join(', ') + '.');
+  }
+  if (proteccion.fallos.length) {
+    partes.push('SIN bloquear: ' + proteccion.fallos.join(' | ') + '.');
+  }
+  partes.push(sombreado
+    ? 'Sombreado automático aplicado.'
+    : 'Sin sombreado: faltan las columnas de validación o la del motivo.');
+
+  sheet.getParent().toast(partes.join(' '), 'Devoluciones', 15);
 }
 
 /**
