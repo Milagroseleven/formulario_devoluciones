@@ -115,7 +115,7 @@ cambia el motivo:
 | Color | Qué significa |
 | --- | --- |
 | Gris | Esa validación no aplica en esa fila. No hay que rellenarla |
-| Ámbar | Es la que toca y sigue vacía: está pendiente |
+| Amarillo | Es la que toca y sigue vacía: está pendiente |
 | Sin color | Ya está validada |
 
 La leyenda queda también como nota sobre el título de las dos columnas, para
